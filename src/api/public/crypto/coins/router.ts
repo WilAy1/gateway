@@ -32,6 +32,31 @@ coinsRouter.get('/coins', async (req, res) => {
 });
 
 
+coinsRouter.get('/coins/:id', async (req, res) => {
+    const CHAIN_NAME = req.params.id;
+    try {
+        const allCoins = await fetchCoins({ fromChain: CHAIN_NAME});
+        
+        if(allCoins.length == 0){
+            return res.status(StatusCodes.NOT_FOUND).json({error : `No active coins found!`})
+        }
+
+        const response = {
+            status: true,
+            message: "Coins fetched",
+            data: allCoins
+        };
+
+        return res.status(StatusCodes.OK).json(response)
+
+    }
+    catch (error) {
+        console.error("Error in /coins route:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "Internal server error" });
+    }
+});
+
+
 coinsRouter.get('/coin/:id', async (req, res) => {
     const COIN_ID = req.params.id;
     if(!isValidUUID(COIN_ID)) {
