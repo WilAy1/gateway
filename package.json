@@ -23,7 +23,9 @@
     "@types/uuid": "^9.0.8",
     "@typescript-eslint/eslint-plugin": "^7.1.1",
     "@typescript-eslint/parser": "^7.1.1",
+    "chai": "^5.1.1",
     "eslint": "^8.57.0",
+    "mocha": "^10.4.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   },
@@ -44,6 +46,7 @@
     "nodemon": "^3.1.0",
     "pg": "^8.11.3",
     "pg-pool": "^3.6.1",
+    "redis": "^4.6.15",
     "save": "^2.9.0",
     "save-dev": "^0.0.1-security",
     "uuid": "^9.0.1"

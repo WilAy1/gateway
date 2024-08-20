@@ -1,3 +1,4 @@
+import { Request } from "express";
 import { UniqueObject } from "../interfaces/db.interface";
 import crypto from 'crypto';
 
@@ -80,3 +81,36 @@ export function parseUserAgent(userAgent) {
         return 'Unknown';
     }
 }
+
+
+export function analyzeRequestParams(req: Request) {
+    const ip = req.ip || req.connection.remoteAddress;
+
+    const userAgent = req.headers['user-agent'];
+
+    const deviceType = parseUserAgent(userAgent);
+
+    return {
+        ip: ip,
+        userAgent: userAgent,
+        deviceType: deviceType
+    }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+interface RequestParams {
+    ip: string,
+    userAgent: string,
+    deviceType: string
+}
+
+
+export interface GWObject { // custom json
+    [key: string]: unknown;
+  }
+  
+export function removeKeys<T extends GWObject, K extends keyof T>(obj: T, keysToRemove: K[]): Omit<T, K> {
+  const newObj = { ...obj };
+  keysToRemove.forEach(key => delete newObj[key]);
+  return newObj as Omit<T, K>;
+}  

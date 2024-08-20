@@ -1,8 +1,9 @@
 import express from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { fetchCoin, fetchCoins } from '../../../../db/crypto/functions.db';
-import { isValidUUID } from '../../../../utils/utils';
+import { isEmpty, isValidUUID } from '../../../../utils/utils';
 import { solanaCoinRouter } from './solana/router';
+import { Chain } from '../../../../interfaces/coins';
 
 export const coinsRouter = express.Router();
 
@@ -10,16 +11,16 @@ export const coinsRouter = express.Router();
 coinsRouter.get('/coins', async (req, res) => {
     try {
 
-        const allCoins = await fetchCoins();
+        const chainsWithCoins: Chain = await fetchCoins();
         
-        if(allCoins.length == 0){
+        if(isEmpty(Object.keys(chainsWithCoins))){
             return res.status(StatusCodes.NOT_FOUND).json({error : `No active coins found!`})
         }
 
         const response = {
             status: true,
             message: "Coins fetched",
-            data: allCoins
+            data: chainsWithCoins
         };
 
         return res.status(StatusCodes.OK).json(response)
@@ -35,16 +36,16 @@ coinsRouter.get('/coins', async (req, res) => {
 coinsRouter.get('/coins/:id', async (req, res) => {
     const CHAIN_NAME = req.params.id;
     try {
-        const allCoins = await fetchCoins({ fromChain: CHAIN_NAME});
+        const chainWithCoins = await fetchCoins({ fromChain: CHAIN_NAME});
         
-        if(allCoins.length == 0){
+        if(isEmpty(Object.keys(chainWithCoins))){
             return res.status(StatusCodes.NOT_FOUND).json({error : `No active coins found!`})
         }
 
         const response = {
             status: true,
             message: "Coins fetched",
-            data: allCoins
+            data: chainWithCoins
         };
 
         return res.status(StatusCodes.OK).json(response)

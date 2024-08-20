@@ -1,0 +1,17 @@
+How does it work?
+
+Using client side directly
+Only method available -> payment by deposit
+
+Needed params: amount, currency, coin, chain, refund_address, email, 
+
+user chooses from available chain -> chooses from available coins -> provides a refund address incase of a fail ->
+user initializes transaction -> we send a deposit address with rate -> we wait and verify the amount deposited -> we send the transaction object back -> send receipt to the customer
+
+
+Using our side
+we only need: amount, currency, email, refund_address
+
+user initialized transaction with above params -> we return an object containing a payment url leading to our platform ->
+the payment url is opened -> user selects coin, chain, provides refund address -> rate is fetched for the user -> 
+user selects button to finalize payment (initialize transaction) -> deposit address is fetched -> we wait and verify the transaction -> if callback_url is provided, we open the callback url -> send receipt to customer

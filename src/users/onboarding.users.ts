@@ -1,7 +1,8 @@
 import { StatusCodes } from 'http-status-codes';
 import { authRegister, authenticateLogin, verifyUser } from '../db/users/auth.db';
-import { parseUserAgent } from '../utils/utils';
+import { analyzeRequestParams } from '../utils/utils';
 import express from 'express';
+import { UseLoginResponse } from '../interfaces/auth.users.interface';
 
 export const onboardingRouter = express.Router();
 
@@ -22,6 +23,8 @@ onboardingRouter.post('/register', async (req, res) => {
         return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "Internal server error" });
     }
 });
+
+
 onboardingRouter.post('/verify-user', async (req, res) => {
     try {
         const { email, hash, code } = req.body;
@@ -38,16 +41,16 @@ onboardingRouter.post('/verify-user', async (req, res) => {
         return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "Internal server error" });
     }
 });
+
+
 onboardingRouter.post('/login', async (req, res) => {
     try {
         const { email, password, device_id } = req.body;
-        const ip = req.ip || req.connection.remoteAddress;
 
-        const userAgent = req.headers['user-agent'];
+        const { ip, userAgent, deviceType } = analyzeRequestParams(req);
 
-        const deviceType = parseUserAgent(userAgent);
 
-        let result;
+        let result : UseLoginResponse;
 
         if (email && password && device_id) {
             result = await authenticateLogin({

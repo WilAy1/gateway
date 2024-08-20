@@ -2,8 +2,13 @@ import jwt from 'jsonwebtoken';
 import { env } from './env';
 
 
-export function generateBearerToken(data: unknown, expiresIn?: number) : string {
-    const token = jwt.sign(data, env.SECURE_GEN_KEY, {expiresIn});
+export function generateLoginBearerToken(data: unknown, expiresIn?: number) : string {
+    const token = jwt.sign(data, env.SECURE_LOGIN_GEN_KEY, expiresIn && {expiresIn});
+    return token;
+}
+
+export function generateApiBearerToken(data: unknown, expiresIn?: number) : string {
+    const token = jwt.sign(data, env.SECURE_GEN_KEY, expiresIn && {expiresIn});
     return token;
 }
 

@@ -4,7 +4,7 @@ import { comparePassword, hashPassword } from "../../utils/passwordUtils";
 import { codeGenerator, generateRandomHash, isEmpty, isValidEmail, isValidPassword } from "../../utils/utils";
 import Query from "../query";
 import pool from "../connect";
-import { generateBearerToken } from "../../utils/generate_secure_token";
+import { generateLoginBearerToken } from "../../utils/generate_secure_token";
 
 
 export async function authRegister(email: string, password: string) : Promise<UserRegisterResponse> {
@@ -327,9 +327,9 @@ export async function authenticateLogin( params: UserLoginParams ) : Promise<Use
 
         // generate jwt token for account auth
         
-        const bearerToken = generateBearerToken(
+        const bearerToken = generateLoginBearerToken(
             {
-                email: result[0]["email"],
+                userId: result[0]["user_id"],
                 deviceId: params.deviceId,
                 userAgent: params.userAgent
 
@@ -383,4 +383,60 @@ export async function authenticateLogin( params: UserLoginParams ) : Promise<Use
         console.error("Error finding user:", error);
         throw new Error("An error occurred while finding user");
     }
+}
+
+
+
+export async function verifyLoginToken(userDetails : LoginToken, token: string) : Promise<boolean>{
+    try {
+        const { userId, deviceId } = userDetails;
+        
+        const query = new Query("login_tokens");
+        const result = await query.select({
+            conditions: {
+                compulsory: [
+                    {
+                        key: "user_id",
+                        value: userId
+                    },
+                    {
+                        key: "device_id",
+                        value: deviceId
+                    },
+                    {
+                        key: "token",
+                        value: token
+                    },
+                    {
+                        key: "status",
+                        value: "active"
+                    }
+                ]
+            }
+        });
+
+        if (isEmpty(result)){
+            return false;
+        }
+        return true;
+    }
+    catch (error) {
+        console.error("Error verifying login token: ", error);
+        throw new Error("Login token verification failed");
+    }
+}
+
+
+
+export async function logAction() {
+    
+}
+
+
+
+interface LoginToken {
+    userId: string;
+    deviceId: string;
+    userAgent: string;
+
 }

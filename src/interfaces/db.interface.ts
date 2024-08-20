@@ -30,5 +30,5 @@ export interface ChainDetails {
     chainId: string;
 }
 export interface CoinDetails {
-    fromChain?: string
+    fromChain: string
 }

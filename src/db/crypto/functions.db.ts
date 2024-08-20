@@ -1,4 +1,5 @@
-import { UnitCoin } from "../../interfaces/coins";
+import { QueryResult } from "pg";
+import { Chain, UnitCoin } from "../../interfaces/coins";
 import { ChainDetails, CoinDetails } from "../../interfaces/db.interface";
 import Query from "../query";
 
@@ -26,31 +27,63 @@ export async function isChainActive( params: ChainDetails ) : Promise<boolean> {
     }
 }
 
-export async function fetchCoins( params?: CoinDetails) : Promise<Array<UnitCoin>> {
+export async function fetchCoins( params?: CoinDetails) : Promise<Chain> {
     try {
         const query = new Query("available_coins");
-        const result = await query.select({
-            cols: [
-                "coin_id",
-                "coin_name",
-                "chain_name",
-                "status"
-            ],
-            conditions:  {
-                compulsory: [
-                    {
-                        key: "status",
-                        value: "active"
-                    },
-                    params.fromChain && {
-                        key: "chain_name",
-                        value: params.fromChain.toLowerCase()
-                    }
-                ]
-            }
-        }) as UnitCoin[];
+        const q = "SELECT ac.coin_id, ac.coin, ac.contract_address, ch.chain FROM available_coins ac "+
+        `JOIN available_chains ch ON ac.chain_id = ch.chain_id WHERE ac.status=$1 AND ch.status=$2 ${params ? 'AND ch.chain=$3' : ''}`;
+        const vals = [
+            'active', 'active'
+        ];
 
-        return result;
+        if(params){
+            vals.push(params.fromChain);
+        }
+
+
+        const result = await query.customQuery(q, vals) as QueryResult;
+
+    
+        const data: Chain = {};
+        result.rows.forEach(row => {
+            const chainName = row.chain;
+            if (!data[chainName]) {
+                data[chainName] = { chain: chainName, coins: [] };
+            }
+            data[chainName].coins.push({
+                id: row.coin_id,
+                coin: row.coin,
+                contract_address: row.contract_address,
+            });
+        });
+
+        return data;
+
+
+
+
+        // const result = await query.select({
+        //     cols: [
+        //         "coin_id",
+        //         "coin",
+        //         "chain_id",
+        //         "status"
+        //     ],
+        //     conditions:  {
+        //         compulsory: [
+        //             {
+        //                 key: "status",
+        //                 value: "active"
+        //             },
+        //             params && params.fromChain && {
+        //                 key: "chain_name",
+        //                 value: params.fromChain.toLowerCase()
+        //             }
+        //         ]
+        //     }
+        // }) as UnitCoin[];
+
+        // return result;
     }
     catch (error) {
         console.error("Error fetching coins:", error);
@@ -64,8 +97,9 @@ export async function fetchCoin(coinId:string) : Promise<Array<UnitCoin>> {
         const result = await query.select({
             cols: [
                 "coin_id",
-                "coin_name",
-                "chain_name"
+                "coin",
+                "contract_address",
+                "chain_id"
             ],
             conditions: {
                 compulsory: [

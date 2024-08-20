@@ -30,7 +30,7 @@ class Query {
         let conditionStatement : string;
 
         if(optionalConditions && compulsoryConditions) {
-             conditionStatement = `WHERE (${optionalConditions.join(' OR ')}) AND (${compulsoryConditions.join(' AND ')})`;
+             conditionStatement = `WHERE (${optionalConditions.join(' OR ')}) OR (${compulsoryConditions.join(' AND ')})`;
         }
         else if (optionalConditions) {
             conditionStatement = `WHERE (${optionalConditions.join(' OR ')})`;
@@ -179,10 +179,19 @@ class Query {
                 throw new Error("No condition provided.");
             }
 
-            const { query, conditionValues } = this.generateDeleteQuery(conditions);
+            const deleteCondition = this.generateCondition(conditions);
+
+            const query = `DELETE FROM ${this.table} ${deleteCondition}`;
+            
+            const conditionValues = (conditions.optional?.map((key, _) => key.value) || [])
+                                    .concat((conditions.compulsory?.map((key, _)=> key.value)) || []);
+
+            console.log(query, conditionValues);
+
+            //const { query, conditionValues } = this.generateCondition(conditions);
             
             
-            console.log(query, conditionValues)
+            //console.log(query, conditionValues)
             //await pool.query(query, conditionValues); // insert into table
 
 
@@ -208,6 +217,17 @@ class Query {
         catch(error){
             console.error(error);
             return [];
+        }
+    }
+
+    async customQuery(query: string, values: Array<string | boolean | number>) : Promise<unknown> {
+        try {
+            const result = await pool.query(query, values);
+            return result;
+        }
+        catch(error) {
+            console.error(error);
+            return;
         }
     }
 

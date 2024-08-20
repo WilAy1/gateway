@@ -1,6 +1,15 @@
 export interface UnitCoin {
     id: string,
-    name: string,
+    coin: string,
     contract_address: string,
-    chain: string
+    chain? : string
+}
+
+export interface Chain {
+    [key: string] : ChainWithCoins
+}
+
+interface ChainWithCoins{
+    chain: string,
+    coins: UnitCoin[]
 }

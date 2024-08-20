@@ -1,11 +1,38 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import solanaWeb3 from "@solana/web3.js";
+import { Wallet, WalletData } from "../../interfaces/wallet";
+import { ChainTypes } from "../../enums/chain";
 
-const generateKey = async () => {
-    console.log("Start");
+const generateSolanaWallet = async () : Promise<string> => {
+  try {
   const keyPair = solanaWeb3.Keypair.generate();
 
-  console.log("Public Key:", keyPair.publicKey.toString());
-  console.log("Secret Key:", keyPair.secretKey)
+  const walletData : Wallet = {
+    chain: ChainTypes.SOLANA,
+    address: keyPair.publicKey.toString(),
+  }
+
+  // save wallet's data
+  
+  const completeWalletData : WalletData = {
+    ...walletData, 
+    key: keyPair.secretKey
+  }
+
+  console.log(walletData);
+
+  
+  return walletData.address;
+  }
+  catch(error) {
+    throw new Error("Error generating solana address:\n " + error);
+  }
+
 };
 
-export default generateKey;
+
+function saveWalletData(wallet: WalletData) {
+  
+}
+
+export default generateSolanaWallet;
