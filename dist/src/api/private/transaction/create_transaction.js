@@ -8,15 +8,15 @@ exports.parseCreateTransaction = exports.isValidPaymentChannel = exports.isValid
 const express_1 = __importDefault(require("express"));
 const http_status_codes_1 = require("http-status-codes");
 const generate_payment_url_1 = require("./generate_payment_url");
-//import { TransactionDB } from '../../../db/transactions/transactions.db';
+const transactions_db_1 = require("../../../db/transactions/transactions.db");
 exports.createTransactionRouter = express_1.default.Router();
-// createTransactionRouter.post('/complete', async (req, res) => {
-//     const issuer = req['user'];
-//     const tDB = new TransactionDB(issuer["userId"]);
-//     const { transaction_id } = req.body;
-//     tDB.confirmTransaction(transaction_id);
-//     return res.status(StatusCodes.OK).json({});
-// })
+exports.createTransactionRouter.post('/complete', async (req, res) => {
+    const issuer = req['user'];
+    const tDB = new transactions_db_1.TransactionDB(issuer["userId"]);
+    const { transaction_id } = req.body;
+    tDB.confirmTransaction(transaction_id);
+    return res.status(http_status_codes_1.StatusCodes.OK).json({});
+});
 exports.createTransactionRouter.get('/fetch', async (req, res) => {
     try {
         const issuer = req['user'];
@@ -29,7 +29,7 @@ exports.createTransactionRouter.get('/fetch', async (req, res) => {
             });
         }
         return res.status(http_status_codes_1.StatusCodes.OK).json({
-            success: "success",
+            success: true,
             message: response.message,
             data: response.result
         });
@@ -51,7 +51,7 @@ exports.createTransactionRouter.post('/create', async (req, res) => {
             });
         }
         return res.status(http_status_codes_1.StatusCodes.OK).json({
-            success: "success",
+            success: true,
             message: response.message,
             payment_url: response.payment_url
         });
@@ -69,7 +69,7 @@ exports.createTransactionRouter.post('/generate-address', async (req, res) => {
             return res.status(http_status_codes_1.StatusCodes.BAD_REQUEST).json({ error: response.error, message: response.message });
         }
         return res.status(http_status_codes_1.StatusCodes.OK).json({
-            success: "success",
+            success: true,
             message: response.message,
             data: response.result
         });

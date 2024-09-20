@@ -3,79 +3,70 @@ import { randomUUID } from 'crypto';
 import express from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { createClient } from 'redis';
+import Rates from '../../../services/rates/rates';
 
 export const ratesRouter = express.Router();
-const client = createClient();
+// const client = createClient();
 
 
 
 
 
-// fetch rate from api. returns every usd value e.g [{pair:"sol-usd", value: 180}]
-// save the rate with an id
-// on fetch rate, convert it to 
+// // fetch rate from api. returns every usd value e.g [{pair:"sol-usd", value: 180}]
+// // save the rate with an id
+// // on fetch rate, convert it to 
 
 
-// client.on('error', (err) => {
-//     console.error('Redis client error:', err);
-//   });
+// // client.on('error', (err) => {
+// //     console.error('Redis client error:', err);
+// //   });
   
-//   // Connect to Redis
- client.connect().catch(console.error);
+// //   // Connect to Redis
+//  client.connect().catch(console.error);
 
 
 
-function fetchRatesFromAPI() { // fetches usd rate
-    const rates = Object.keys(PAIR_USD).map((value) => {
-        return { id: value, rate: PAIR_USD[value] }
-    });
+// function fetchRatesFromAPI() { // fetches usd rate
+//     const rates = Object.keys(PAIR_USD).map((value) => {
+//         return { id: value, rate: PAIR_USD[value] }
+//     });
     
-    
-  return rates;
-}
+//   return rates;
+// }
 
 
 
   
-// Function to fetch and save rates
-async function fetchAndSaveRates() {
-  try {
-    const rates = fetchRatesFromAPI();
-    for (const rate of rates) {
-      try {
-        // Set rate with 1-hour TTL (60 seconds)
-        await client.setEx(rate.id, 60, JSON.stringify(rate));
-        //console.log(`Rate for ${rate.id} saved successfully.`);
-      } catch (err) {
-        console.error(`Failed to save rate for ${rate.id}:`, err);
-      }
-    }
-  } catch (error) {
-    //console.error('Error fetching and saving rates:', error);
-  }
-}
+// // Function to fetch and save rates
+// async function fetchAndSaveRates() {
+//   try {
+//     const rates = fetchRatesFromAPI();
+//     for (const rate of rates) {
+//       try {
+//         // Set rate with 1-hour TTL (60 seconds)
+//         await client.setEx(rate.id, 60, JSON.stringify(rate));
+//         //console.log(`Rate for ${rate.id} saved successfully.`);
+//       } catch (err) {
+//         console.error(`Failed to save rate for ${rate.id}:`, err);
+//       }
+//     }
+//   } catch (error) {
+//     //console.error('Error fetching and saving rates:', error);
+//   }
+// }
 
 
 
-async function getRate(id: string) : Promise<APIRate> {
-  try {
-    const reply = await client.get(id);
-    return JSON.parse(reply) as APIRate;
-  } catch (err) {
-    throw new Error(`Failed to get rate for ${id}: ${err.message}`);
-  }
-}
+// async function getRate(id: string) : Promise<APIRate> {
+//   try {
+//     const reply = await client.get(id);
+//     return JSON.parse(reply) as APIRate;
+//   } catch (err) {
+//     throw new Error(`Failed to get rate for ${id}: ${err.message}`);
+//   }
+// }
 
   
-
-// Run fetchAndSaveRates every minute
-setInterval(fetchAndSaveRates, 6000);
-
-fetchAndSaveRates();
-  
-
-
-
 
 
 
@@ -102,8 +93,10 @@ export const getConversionRate = async (params: GetRateParams) => {
 
         const { from, to, amount = null } = params;
 
-        const rate_from = await getRate(from);
-        const rate_to = await getRate(to);
+
+        const ratesClass = new Rates();
+        const rate_from = await ratesClass.getRate(from);
+        const rate_to = await ratesClass.getRate(to);
 
 
         const from_to_usd = rate_from.rate;

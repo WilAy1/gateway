@@ -1,12 +1,12 @@
 import { QueryResult } from "pg";
 import { Chain, UnitCoin } from "../../interfaces/coins";
 import { ChainDetails, CoinDetails } from "../../interfaces/db.interface";
-import Query from "../query";
+import Table from "../query";
 
 
 export async function isChainActive( params: ChainDetails ) : Promise<boolean> {
     try {
-        const query = new Query("chains");
+        const query = new Table("chains");
 
         const result = await query.select({ conditions: { compulsory:  [ 
             {
@@ -29,7 +29,7 @@ export async function isChainActive( params: ChainDetails ) : Promise<boolean> {
 
 export async function fetchCoins( params?: CoinDetails) : Promise<Chain> {
     try {
-        const query = new Query("available_coins");
+        const query = new Table("available_coins");
         const q = "SELECT ac.coin_id, ac.coin, ac.contract_address, ch.chain FROM available_coins ac "+
         `JOIN available_chains ch ON ac.chain_id = ch.chain_id WHERE ac.status=$1 AND ch.status=$2 ${params ? 'AND ch.chain=$3' : ''}`;
         const vals = [
@@ -93,7 +93,7 @@ export async function fetchCoins( params?: CoinDetails) : Promise<Chain> {
 
 export async function fetchCoin(coinId:string) : Promise<Array<UnitCoin>> {
     try {
-        const query = new Query("available_coins");
+        const query = new Table("available_coins");
         const result = await query.select({
             cols: [
                 "coin_id",

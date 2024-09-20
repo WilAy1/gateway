@@ -27,7 +27,7 @@ async function getDepositAddress(issuer, params) {
     //
     try {
         let depositAddress;
-        const { transaction_id, reference, chain, coin } = params;
+        const { transaction_id, reference, chain, coin, rates } = params;
         const query = new query_1.default("transactions");
         const transactionResult = await query.select({
             conditions: {
@@ -46,6 +46,17 @@ async function getDepositAddress(issuer, params) {
         if ((0, utils_1.isEmpty)(transactionResult))
             return { status: false, error: "transaction_unknown", message: "Couldn't find trasaction" };
         const transaction = transactionResult[0];
+        const { rate, amount_to, price_from, price_to } = await (0, router_1.getConversionRate)({
+            amount: parseFloat(transaction["amount"]),
+            from: transaction["currency"],
+            to: coin
+        });
+        if (String(rate) !== String(rates['rate']))
+            return {
+                status: false,
+                error: "rates_error",
+                message: "Price updated, try again",
+            };
         if (transaction["onchain_status"] == null && transaction["deposit_address"] == null) {
             switch (chain) {
                 case chain_1.ChainTypes.SOLANA:
@@ -57,11 +68,6 @@ async function getDepositAddress(issuer, params) {
             if (!depositAddress) {
                 return { status: false, error: "address_error", message: "Failed to generate deposit address" };
             }
-            const { rate, amount_to, price_from, price_to } = (0, router_1.getRate)({
-                amount: parseFloat(transaction["amount"]),
-                from: transaction["currency"],
-                to: coin
-            });
             // change status to  awaiting_payment
             const status = create_transaction_1.TransactionStatus.AWAITINGPAYMENT;
             const date = new Date();

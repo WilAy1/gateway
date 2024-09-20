@@ -1,6 +1,6 @@
 import { generateApiBearerToken } from "../../utils/generate_secure_token";
 import { isEmpty } from "../../utils/utils";
-import Query from "../query";
+import Table from "../query";
 
 export async function generateApiToken(userId: string) : Promise<string> {
     try {
@@ -9,7 +9,7 @@ export async function generateApiToken(userId: string) : Promise<string> {
             userId: userId
         });
 
-        const query = new Query("apitokens");
+        const query = new Table("apitokens");
 
         await query.update(
             [
@@ -55,7 +55,7 @@ export async function verifyApiToken(userDetails, token: string) : Promise<boole
     try {
         const { userId } = userDetails;
         
-        const query = new Query("apitokens");
+        const query = new Table("apitokens");
         const result = await query.select({
             conditions: {
                 compulsory: [

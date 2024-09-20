@@ -1,14 +1,14 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Request } from "express";
-import { Customer, GenerateAddressParams, InitTransactionParams, PaymentMethod, TransactionObject, TransactionStatus } from "./create_transaction";
-import Query from "../../../db/query";
+import { Customer, GenerateAddressParams, InitTransactionParams, PaymentMethod, TransactionObject } from "./create_transaction";
+import { TransactionStatus } from '../../../interfaces/TransactionStatus';
+import Table from "../../../db/query";
 import { GWObject, isEmpty, isValidEmail, removeKeys } from "../../../utils/utils";
 import { fetchCoin } from "../../../db/crypto/functions.db";
 import { ChainTypes } from "../../../enums/chain";
 import { getConversionRate } from "../../public/rates/router";
 import { QueryResult } from "pg";
-import generateSolanaWallet from "../../../crypto/solana/generate_addr";
-import { startSolanaListening } from "../../../crypto/solana/connection";
+import Solana from "../../../services/solana/solana";
 
 const PLATFORM_PAYMENT_URL = "http://localhost:3001/pay";
 
@@ -41,7 +41,15 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
 
         const { transaction_id, reference, chain, coin, rates } = params;
 
-        const query = new Query("transactions");
+        if(!transaction_id || !reference || !chain || !coin || !rates) {
+            return {
+                status : false,
+                error: "param_error",
+                message : "All parameters aren't available",
+            }
+        }
+
+        const query = new Table("transactions");
 
         const transactionResult = await query.select({
             conditions: {
@@ -80,10 +88,10 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
 
         if(transaction["onchain_status"] == null && transaction["deposit_address"] == null) {
 
-
+            const solana = new Solana();
             switch(chain) {
                 case ChainTypes.SOLANA:
-                    depositAddress = await generateSolanaWallet();
+                    depositAddress = await solana.generate();
                     break;
                 default:
                     break;                    
@@ -170,7 +178,7 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
                 ]);
 
             //startSolanaListening(updatedResult['deposit_address'] as string);
-                
+
             return {
                 status : true,
                 message : "Successfully generated address",
@@ -189,7 +197,7 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
 
 export async function fetchTransaction(issuer: Map<string, unknown>, params) {
     try {
-        const query = new Query("transactions");
+        const query = new Table("transactions");
 
         const { reference } = params;
 
@@ -263,7 +271,7 @@ export async function generatePaymentUrl(issuer: Map<string, unknown>, params: I
         if(!currencyCheck) return { status: false, error: 'invalid_currency', message: "Failed to create transaction" }
         
 
-        const query = new Query("transactions");
+        const query = new Table("transactions");
 
         const date = new Date();
         const created_at = date.toISOString();
@@ -346,7 +354,7 @@ function generateTransactionReference() : string {
 
 
 async function currencyExists(currency: string) : Promise<boolean> {
-    const query = new Query("available_currencies");
+    const query = new Table("available_currencies");
     const result = await query.select({
         conditions: {
             compulsory: [

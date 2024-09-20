@@ -1,6 +1,6 @@
 import { UUID } from "crypto";
 import { GWObject, isEmpty } from "../../utils/utils";
-import Query from "../query";
+import Table from "../query";
 
 
 type WalletParams = {
@@ -34,12 +34,12 @@ enum CREDIT_REASONS {
  */
 
 class WalletDBQueries{
-    protected wallet_query: Query;
-    protected activity_query: Query;
+    protected wallet_query: Table;
+    protected activity_query: Table;
     protected userId: string;
     constructor(params: WalletParams) {
-        this.wallet_query = new Query("wallet");
-        this.activity_query = new Query("wallet_activity")
+        this.wallet_query = new Table("wallet");
+        this.activity_query = new Table("wallet_activity")
         this.userId = params.userId;
     }
 

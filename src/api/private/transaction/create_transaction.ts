@@ -2,19 +2,19 @@
 import express, { Request } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { getDepositAddress, generatePaymentUrl, fetchTransaction } from './generate_payment_url';
-import { TransactionDB } from '../../../db/transactions/transactions.db';
+import { TransactionStatus } from '../../../interfaces/TransactionStatus';
 
 export const createTransactionRouter = express.Router();
 
 
-createTransactionRouter.post('/complete', async (req, res) => {
-    const issuer = req['user'];
-    const tDB = new TransactionDB(issuer["userId"]);
-    const { transaction_id } = req.body;
-    tDB.confirmTransaction(transaction_id);
+// createTransactionRouter.post('/complete', async (req, res) => {
+//     const issuer = req['user'];
+//     const tDB = new TransactionDB(issuer["userId"]);
+//     const { transaction_id } = req.body;
+//     tDB.confirmTransaction(transaction_id);
 
-    return res.status(StatusCodes.OK).json({});
-})
+//     return res.status(StatusCodes.OK).json({});
+// })
 
 
 createTransactionRouter.get('/fetch', async (req, res) => {
@@ -143,15 +143,6 @@ interface ClientCreateTransaction {
     description?: string
     callback_url?: string
     metadata?: Record<string, unknown>
-}
-
-export enum TransactionStatus {
-    COMPLETED = 'completed',
-    CANCELLED = 'cancelled',
-    AWAITINGPAYMENT = 'awaiting_payment',
-    AWAITINGCONFIRMATION = 'awaiting_confirmation',
-    INITIALIZED = 'initialized',
-    WAITING = 'waiting',
 }
 
 // initialized (tr created) -> waiting (waiting for address generation) -> awaiting_payment -> awaiting_confirmation -> success/cancelled

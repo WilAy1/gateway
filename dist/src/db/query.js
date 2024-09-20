@@ -23,7 +23,7 @@ class Query {
         const optionalConditions = conditions.optional?.map((key, index) => `${key.key} = $${keysLength + index + 1}`);
         let conditionStatement;
         if (optionalConditions && compulsoryConditions) {
-            conditionStatement = `WHERE (${optionalConditions.join(' OR ')}) AND (${compulsoryConditions.join(' AND ')})`;
+            conditionStatement = `WHERE (${optionalConditions.join(' OR ')}) OR (${compulsoryConditions.join(' AND ')})`;
         }
         else if (optionalConditions) {
             conditionStatement = `WHERE (${optionalConditions.join(' OR ')})`;
@@ -128,8 +128,13 @@ class Query {
             if (!(conditions.compulsory || conditions.optional)) {
                 throw new Error("No condition provided.");
             }
-            const { query, conditionValues } = this.generateDeleteQuery(conditions);
+            const deleteCondition = this.generateCondition(conditions);
+            const query = `DELETE FROM ${this.table} ${deleteCondition}`;
+            const conditionValues = (conditions.optional?.map((key, _) => key.value) || [])
+                .concat((conditions.compulsory?.map((key, _) => key.value)) || []);
             console.log(query, conditionValues);
+            //const { query, conditionValues } = this.generateCondition(conditions);
+            //console.log(query, conditionValues)
             //await pool.query(query, conditionValues); // insert into table
             return true;
         }

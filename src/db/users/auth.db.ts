@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { UseLoginResponse, UserRegisterResponse, UserAccountState, UserVerificationResponse, UserLoginParams } from "../../interfaces/auth.users.interface";
 import { comparePassword, hashPassword } from "../../utils/passwordUtils";
 import { codeGenerator, generateRandomHash, isEmpty, isValidEmail, isValidPassword } from "../../utils/utils";
-import Query from "../query";
+import Table from "../query";
 import pool from "../connect";
 import { generateLoginBearerToken } from "../../utils/generate_secure_token";
 
@@ -26,7 +26,7 @@ export async function authRegister(email: string, password: string) : Promise<Us
         await client.query('BEGIN');
 
 
-        const query = new Query("users");
+        const query = new Table("users");
         const result = await query.select({
             conditions: {
                 compulsory: [
@@ -171,7 +171,7 @@ export async function verifyUser(email: string, hash: string, code: string) : Pr
             value: email
         }]
 
-        const query = new Query("users");
+        const query = new Table("users");
         
         const result = await query.select({
             cols: [ "hash" ],
@@ -233,7 +233,7 @@ export async function verifyUser(email: string, hash: string, code: string) : Pr
 
 export async function authenticateLogin( params: UserLoginParams ) : Promise<UseLoginResponse> {
     try {
-        const query = new Query("users");
+        const query = new Table("users");
         const result = await query.select({
             conditions: {
                 compulsory: [
@@ -304,7 +304,7 @@ export async function authenticateLogin( params: UserLoginParams ) : Promise<Use
             value: 'active'
         }]
 
-        const loginQuery = new Query("login_tokens");
+        const loginQuery = new Table("login_tokens");
 
         const deviceCheck = await loginQuery.select({
             conditions: {
@@ -391,7 +391,7 @@ export async function verifyLoginToken(userDetails : LoginToken, token: string) 
     try {
         const { userId, deviceId } = userDetails;
         
-        const query = new Query("login_tokens");
+        const query = new Table("login_tokens");
         const result = await query.select({
             conditions: {
                 compulsory: [

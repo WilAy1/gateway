@@ -4,5 +4,6 @@ export interface Wallet {
 }
 
 export interface WalletData extends Wallet {
-    key: Uint8Array
+    key: Uint8Array,
+    accountId: number
 }

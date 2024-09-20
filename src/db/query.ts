@@ -3,7 +3,7 @@ import { makeObjectUnique } from "../utils/utils";
 import pool from "./connect";
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
-class Query {
+class Table {
     table: string;
     
      constructor(table: string){
@@ -233,6 +233,6 @@ class Query {
 
 }
 
-export default Query;
+export default Table;
 
 
