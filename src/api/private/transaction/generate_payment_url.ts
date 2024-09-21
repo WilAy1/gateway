@@ -91,7 +91,7 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
             const solana = new Solana();
             switch(chain) {
                 case ChainTypes.SOLANA:
-                    depositAddress = await solana.generate();
+                    depositAddress = await solana.generate(coin != "sol");
                     break;
                 default:
                     break;                    

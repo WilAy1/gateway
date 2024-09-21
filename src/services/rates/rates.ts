@@ -19,8 +19,8 @@ export default class Rates {
                     rate: parseFloat(res.price)
                 }
             });
-            rates.push({id:"usd", rate:1})
-
+            rates.push({id:"usd", rate:1}, {id: "usdt", rate: 1});
+            
             this.cacheRates(rates);
         } catch (error) {
             //
@@ -34,7 +34,7 @@ export default class Rates {
             try {
                 for (const rate of rates) {
                     try {
-                        await client.setEx(rate.id, 60, JSON.stringify(rate));
+                        await client.setEx(rate.id, 120, JSON.stringify(rate));
                     } catch (err) {
                         console.error(`Failed to save rate for ${rate.id}:`, err);
                     }

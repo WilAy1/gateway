@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import solanaWeb3 from "@solana/web3.js";
-import { Wallet, WalletData } from "../../interfaces/wallet";
-import { ChainTypes } from "../../enums/chain";
+import { Wallet, WalletData } from "../../../interfaces/wallet";
+import { ChainTypes } from "../../../enums/chain";
 
 
 // const generateSolanaWallet = async () : Promise<string> => {

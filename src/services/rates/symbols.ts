@@ -15,6 +15,10 @@ export const SYMBOLS = [
         id: "btc",
         ticker: "BTCUSDT"
     },
+    {
+        id: "usdc",
+        ticker: "USDCUSDT"
+    }
 ]
 
 export function getSymbolId (ticker){

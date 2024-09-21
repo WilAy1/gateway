@@ -17,7 +17,7 @@ resubscribe();
 
 
 const rates = new Rates();
-setInterval(rates.fetchRates , 30000);
+setInterval(rates.fetchRates.bind(rates) , 60000);
 
 rates.fetchRates();
 
