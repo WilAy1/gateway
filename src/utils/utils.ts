@@ -106,7 +106,7 @@ interface RequestParams {
 
 
 export interface GWObject { // custom json
-    [key: string]: unknown;
+    [key: string]: never;
   }
   
 export function removeKeys<T extends GWObject, K extends keyof T>(obj: T, keysToRemove: K[]): Omit<T, K> {

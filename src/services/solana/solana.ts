@@ -17,7 +17,7 @@ export default class Solana {
           
             // save wallet's data
             
-            const accountId = isToken ? this.subscribe(walletData.address) : 0;
+            const accountId = !isToken ? this.subscribe(walletData.address) : 0;
             const completeWalletData : WalletData = {
               ...walletData, 
               key: keyPair.secretKey,
@@ -68,7 +68,8 @@ export default class Solana {
         }
         catch(error){
             console.error(error);
-            throw new Error("Error fetching parsed transaction");
+            this.getParsedTransaction(signature);
+            //throw new Error("Error fetching parsed transaction");
         }
     }
 
@@ -109,7 +110,11 @@ export default class Solana {
                     await transaction.parse(parsedTransaction);
                 }
                 else {
-                    await transaction.parseForToken(parsedTransaction);
+                    getTransactionDetails(parsedTransaction).then(async (walletAddress)=>{
+                        await transaction.parseForToken(parsedTransaction, walletAddress);
+                    }).catch((error)=>{
+                        console.error(error);
+                    });
                 }
             }
         }
@@ -141,6 +146,8 @@ export default class Solana {
               );
         }
     }
+
+    
 }
 
 
@@ -178,3 +185,44 @@ export async function resubscribe(){
         solana.watchTokens(watch as string[]);
     }
 }
+
+const getTransactionDetails = (transaction) => {
+    return new Promise((resolve, reject) => {
+        const instructions = transaction.transaction.message.instructions;
+    
+        const promises = instructions.map(instruction => {
+            if (instruction.programId.toString() === "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") {
+                const { destination } = instruction.parsed.info;
+    
+                return getWalletAddressFromTokenAccount(destination).then(destinationOwner => {
+                    if (destinationOwner) {
+                        resolve(destinationOwner); 
+                    } else {
+                        reject(new Error("No destination owner found"));
+                    }
+                }).catch(err => {console.error(err); reject(err)});
+            }
+    
+            return Promise.resolve();
+        });
+    
+        Promise.all(promises).then(() => {
+            reject(new Error("No matching instructions found")); 
+        });
+    });
+    
+};
+
+
+const getWalletAddressFromTokenAccount = async (tokenAccount) => {
+    const connection = new web3.Connection("https://devnet.helius-rpc.com/?api-key=1cda3a5d-09d7-4cc3-b8c8-ac12f40d2270", {
+        wsEndpoint: "wss://devnet.helius-rpc.com/?api-key=1cda3a5d-09d7-4cc3-b8c8-ac12f40d2270",
+      });
+    const accountInfo = await connection.getParsedAccountInfo(new web3.PublicKey(tokenAccount));
+    
+    if (accountInfo.value) {
+        //console.log(JSON.stringify(accountInfo.value));
+        return accountInfo.value.data['parsed'].info.owner; // This is the wallet address
+    }
+    return null;
+};

@@ -4,6 +4,7 @@ import { GWObject, isEmpty } from "../../utils/utils";
 import { TransactionStatus } from '../../interfaces/TransactionStatus';
 import { ChainTypes } from "../../enums/chain";
 import Solana from "../../services/solana/solana";
+import { DBSelectParams } from "../../interfaces/db.interface";
 
 
 class TransactionsDBQueries {
@@ -16,9 +17,9 @@ class TransactionsDBQueries {
         if(issuer) this.issuer = issuer;
     }
 
-    async fetchTransactions() : Promise<Array<GWObject>> {
+    async fetchTransactions(params?: DBSelectParams) : Promise<Array<GWObject>> {
         try {
-            const transaction = await this.transactions.select({
+            const transaction = await this.transactions.select(params || {
                 conditions: {
                     compulsory: [
                         {
@@ -37,7 +38,7 @@ class TransactionsDBQueries {
         }   
     }
 
-    async fetchTransaction(transaction_id: string) : Promise<boolean | GWObject>{
+    async fetchTransaction(transaction_id: string) : Promise<GWObject>{
         try {
     
             const transaction = await this.transactions.select({
@@ -57,7 +58,7 @@ class TransactionsDBQueries {
 
 
             if(isEmpty(transaction)){
-                return false;
+                return;
             }
             return transaction[0] as GWObject;
 
@@ -315,18 +316,15 @@ class SolanaTransactions {
         
         }
 
-        async parseForToken(payload){
-            console.log(JSON.stringify(payload));
-            return;
-            const parsedIndex =  payload.transaction.message.instructions.findIndex((instr)=>Object.keys(instr).includes('parsed') && instr);
-            const tokenId = payload.transaction.message.instructions[parsedIndex].parsed.info.mint;
+        async parseForToken(payload, depositAddress){
+            const parsedInstr =  payload.transaction.message.instructions.find((instr)=> instr.programId.toString() === "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+            if(!parsedInstr) return;
+            const tokenId = parsedInstr.parsed.info.mint;
             const { meta, transaction, blockTime } = payload;
             const { postTokenBalances } = meta;
             const {  signatures } = transaction;
 
-            const depositAddress =  payload.transaction.message.instructions[parsedIndex].parsed.info.wallet;
-            console.log(depositAddress);
-            return;
+
             const addressBalance = postTokenBalances.find((tokenBalances) => tokenBalances.owner == depositAddress).uiTokenAmount.uiAmount;
             const transactionHash = signatures[0];
 
@@ -401,4 +399,5 @@ class SolanaTransactions {
 }
 
 
-export { TransactionDB, SolanaTransactions };
+
+export { TransactionDB, SolanaTransactions, TransactionsDBQueries };

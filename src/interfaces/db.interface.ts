@@ -15,7 +15,16 @@ export type ConditionChild = {
 
 export type Condition = {
     optional? : ConditionChild[]
-    compulsory? : ConditionChild[]
+    compulsory? : ConditionChild[],
+    limit?: number,
+    offset?: number,
+    orderBy?: string[],
+    orderDir?: OrderDirection   
+}
+
+export enum OrderDirection {
+    ASCENDING = "ASC",
+    DESCENDING = "DESC"
 }
 
 export interface UniqueObject {

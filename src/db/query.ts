@@ -42,6 +42,17 @@ class Table {
             conditionStatement = "";
         }
 
+        if(conditions.orderBy){
+            const orders = conditions.orderBy.join(', ');
+            conditionStatement = conditionStatement.concat(` ORDER BY ${orders} ${conditions.orderDir || "ASC"}`);
+        }
+        if(conditions.limit){
+            conditionStatement = conditionStatement.concat(` LIMIT ${conditions.limit}`);
+        }
+        if(conditions.offset){
+            conditionStatement = conditionStatement.concat(` OFFSET ${conditions.offset}`);
+        }
+
         return conditionStatement;
     }
 
@@ -64,12 +75,13 @@ class Table {
         }
     }
     
-    private generateInsertQuery(keys: unknown[], values: unknown[]): string {
+    private generateInsertQuery(keys: unknown[], values: unknown[], returnColumn?: string): string {
+        const returnCol = returnColumn ? `RETURNING ${returnColumn}` : ''
         const placeholders = values.map((_, index) => `$${index + 1}`);
         const columns = keys.join(', ');
         const placeholdersString = placeholders.join(', ');
     
-        return `INSERT INTO ${this.table} (${columns}) VALUES (${placeholdersString})`;
+        return `INSERT INTO ${this.table} (${columns}) VALUES (${placeholdersString}) ${returnCol}`;
     }
 
 
@@ -150,17 +162,17 @@ class Table {
     }
 
 
-    async insert(keys: string[], values: unknown[]) : Promise<boolean> {
+    async insert(keys: string[], values: unknown[], { returnColumn } : {returnColumn: string} = {returnColumn : null}) : Promise<boolean> {
         try {
             if(keys.length == 0 && keys.length != values.length) {
                 throw new Error("Length of keys doesn't match length of values");
             }
 
-            const query : string = this.generateInsertQuery(keys, values);
-            await pool.query(query, values); // insert into table
+            const query : string = this.generateInsertQuery(keys, values, returnColumn);
+            const response = await pool.query(query, values); // insert into table
 
 
-            return true;
+            return response.rows[0];
 
         }
         catch (error) {
@@ -186,8 +198,6 @@ class Table {
             const conditionValues = (conditions.optional?.map((key, _) => key.value) || [])
                                     .concat((conditions.compulsory?.map((key, _)=> key.value)) || []);
 
-            console.log(query, conditionValues);
-
             //const { query, conditionValues } = this.generateCondition(conditions);
             
             
@@ -209,6 +219,7 @@ class Table {
         try {
             
             const generateQuery : DBQueryReturnType = this.generateSelectQuery(params.cols, params.conditions)
+
 
             const result = await pool.query(generateQuery.query, generateQuery.conditionValues)
 

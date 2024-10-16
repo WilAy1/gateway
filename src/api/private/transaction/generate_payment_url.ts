@@ -9,6 +9,7 @@ import { ChainTypes } from "../../../enums/chain";
 import { getConversionRate } from "../../public/rates/router";
 import { QueryResult } from "pg";
 import Solana from "../../../services/solana/solana";
+import Customers from "../../../db/customers/customers";
 
 const PLATFORM_PAYMENT_URL = "http://localhost:3001/pay";
 
@@ -263,7 +264,21 @@ export async function generatePaymentUrl(issuer: Map<string, unknown>, params: I
         // expected params
         // amount, currency, email
         const { amount, currency, customer, callback_url, description, metadata } = params;
-        if(!amount || !currency || !customer || !customer.email || !isValidEmail(customer.email)) return { status: false, error: 'invalid_params', message: "Failed to create transaction" }
+        if(!amount || !currency || !customer || (!customer.id && !customer.email)) return { status: false, error: 'invalid_params', message: "Failed to create transaction" }
+
+        if(customer.id) {
+            const customerObj = new Customers(issuer['userId']);
+
+            const customerExists = await customerObj.customerExists({id: customer.id});
+
+            if(!customerExists && !isValidEmail(customer.email)){
+                return { status: false, error: 'invalid_params', message: "Failed to create transaction - use a valid customer or enter customer id" }
+            }
+
+            if(!isValidEmail(customer.email)){
+                customer.email = customerExists['email'];
+            }
+        }
 
 
         const currencyCheck = await currencyExists(currency);
@@ -316,13 +331,16 @@ export async function generatePaymentUrl(issuer: Map<string, unknown>, params: I
             callback_url
         ];
 
-        const result = await query.insert(keys, values);
+        const result = await query.insert(keys, values, {returnColumn: "id"});
+
 
         if(result) {
             return {
                 status: true,
                 message: "Transaction generated",
-                payment_url: `${PLATFORM_PAYMENT_URL}/${transaction_reference}`
+                payment_url: `${PLATFORM_PAYMENT_URL}/${transaction_reference}`,
+                id: result['id'],
+                reference: transaction_reference
             }
         }
 

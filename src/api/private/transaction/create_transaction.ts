@@ -33,7 +33,7 @@ createTransactionRouter.get('/fetch', async (req, res) => {
         }
 
         return res.status(StatusCodes.OK).json({
-            success: "success",
+            success: true,
             message: response.message,
             data: response.result
         })
@@ -61,9 +61,13 @@ createTransactionRouter.post('/create', async (req, res) => {
         }
 
         return res.status(StatusCodes.OK).json({
-            success: "success",
+            success: true,
             message: response.message,
-            payment_url: response.payment_url
+            data: {
+                payment_url: response.payment_url,
+                id: response.id,
+                reference: response.reference
+            }
         })
     }
     catch(error) {
@@ -84,7 +88,7 @@ createTransactionRouter.post('/generate-address', async (req, res) => {
         }
 
         return res.status(StatusCodes.OK).json({
-            success: "success",
+            success: true,
             message: response.message,
             data: response.result
         })

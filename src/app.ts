@@ -5,10 +5,13 @@ import { publicRouter } from './api/public/router';
 import { userRouter } from './users/router';
 import { resubscribe } from './services/solana/solana';
 import Rates from './services/rates/rates';
+import { StatusCodes } from 'http-status-codes';
 
 
 const app = express();
 const port = 3000;
+
+if(true){
 
 resubscribe();
 
@@ -20,7 +23,7 @@ const rates = new Rates();
 setInterval(rates.fetchRates.bind(rates) , 60000);
 
 rates.fetchRates();
-
+}
 app.use(cors())
 app.use(express.json());
 
@@ -37,12 +40,28 @@ app.listen(port, () => {
 app.use((err, req, res, _) => {
     console.error(err.stack); // Log the error for debugging purposes
   
-    res.status(500).json({
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
       message: 'Internal Server Error',
       error: err.message,
     });
 });
+
+app.get('*', function(req, res){
+  res.status(StatusCodes.NOT_FOUND).json({
+      success: false,
+      message: "Invalid resource requested",
+      data: {}
+   });
+})
+
+app.post('*', function(req, res){
+  res.status(StatusCodes.NOT_FOUND).json({
+      success: false,
+      message: "Invalid resource requested",
+      data: {}
+   });
+})
 
 
 export default app;
