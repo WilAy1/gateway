@@ -1,10 +1,10 @@
 import { CREDIT_REASONS, WalletDB } from "../wallet/wallet.db";
 import Table from "../query";
-import { GWObject, isEmpty } from "../../utils/utils";
+import { GWObject, isEmpty, isValidUUID } from "../../utils/utils";
 import { TransactionStatus } from '../../interfaces/TransactionStatus';
 import { ChainTypes } from "../../enums/chain";
 import Solana from "../../services/solana/solana";
-import { DBSelectParams } from "../../interfaces/db.interface";
+import { Condition, DBSelectParams } from "../../interfaces/db.interface";
 
 
 class TransactionsDBQueries {
@@ -69,16 +69,40 @@ class TransactionsDBQueries {
         }   
     }
 
-    async updateTransaction(transactionId: string, keys: Array<string>, values: Array<unknown>) : Promise<boolean> {
-        const transaction = await this.fetchTransaction(transactionId);
+    async transactionExists(transactionId) : Promise<boolean> {
+        try {
+    
+            const transaction = await this.transactions.select({
+                conditions: {
+                    compulsory: [
+                        {
+                            key: "id",
+                            value: transactionId
+                        },        
+                    ]
+                }
+            });
+
+
+            return !isEmpty(transaction);      
+        }
+        catch(error){
+            console.error(error);
+            return false;
+        } 
+    }
+
+    async updateTransaction(transactionId: string, keys: Array<string>, values: Array<unknown>, conditions?: Condition) : Promise<boolean> {
+        const transaction = await this.transactionExists(transactionId);
         if(transaction){
             this.transactions.update(keys, values, {
                 compulsory: [
                     {
                         key: "id",
-                        value: transactionId
+                        value: transactionId as unknown
                     }
-                ]
+                ].concat(conditions.compulsory || []),
+                optional: conditions.optional || []
             });
 
             return true;
@@ -98,6 +122,34 @@ class TransactionDB extends TransactionsDBQueries {
 
     constructor(issuer?: string) {
         super(issuer);
+    }
+
+    async cancelTransaction({id}: {id: string}) {
+        if(!isValidUUID(id)) return false
+
+        try {
+            const date = new Date();
+            const isoTime = date.toISOString();
+
+            const conditions: Condition  = {
+                optional: [
+                {
+                    key: "status",
+                    value: TransactionStatus.AWAITINGPAYMENT
+                },
+                {
+                    key: "status",
+                    value: TransactionStatus.INITIALIZED
+                },
+            ]};
+
+            const update = await this.updateTransaction(id, ['cancelled_at', 'status'], [isoTime, TransactionStatus.CANCELLED], conditions);
+
+            return update;
+        }
+        catch {
+            return false;
+        }
     }
 
     async confirmTransaction(transactionParam: ConfirmTransactionParam) : Promise<boolean> {

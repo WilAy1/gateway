@@ -11,7 +11,8 @@ import { StatusCodes } from 'http-status-codes';
 const app = express();
 const port = 3000;
 
-if(true){
+// eslint-disable-next-line no-constant-condition
+if(false){
 
 resubscribe();
 

@@ -74,6 +74,8 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
         if(isEmpty(transactionResult)) return { status: false, error: "transaction_unknown", message: "Couldn't find trasaction" }
         const transaction = transactionResult[0];
 
+        if(transaction["status"] !== TransactionStatus.INITIALIZED) return {status: false, message: "Couldn't generate address for transaction"};
+
 
         const { rate, amount_to, price_from, price_to } = await getConversionRate({
             amount: parseFloat(transaction["amount"]) as number,
@@ -92,7 +94,7 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
             const solana = new Solana();
             switch(chain) {
                 case ChainTypes.SOLANA:
-                    depositAddress = await solana.generate(coin != "sol");
+                    depositAddress = await solana.generate({ isToken: coin != "sol" });
                     break;
                 default:
                     break;                    
@@ -320,7 +322,7 @@ export async function generatePaymentUrl(issuer: Map<string, unknown>, params: I
             amount,
             currency.toLowerCase(),
             transaction_reference,
-            description,
+            description || "Payment",
             created_at,
             transaction_status,
             payment_method,

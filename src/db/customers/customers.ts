@@ -75,20 +75,36 @@ export default class Customers {
     }
 
     async all({showTransactions} : {showTransactions: boolean}) {
-        const transactionObjStr = TRANSACTION_COLS.map((col) => `'${col}', t.${col}`).join(',');
+        try {
+            const transactionObjStr = TRANSACTION_COLS.map((col) => `'${col}', t.${col}`).join(',');
 
-        const transactionsQuery = showTransactions ? 
-            `, CASE WHEN COUNT(t.id) = 0 THEN '[]'::JSON ELSE
-            JSON_AGG(JSON_BUILD_OBJECT(${transactionObjStr})) END AS transactions, c.created_at ` : " ";
-        
-        const transactionsJoin = showTransactions ? "LEFT JOIN transactions t ON c.id=t.customer_id " : " ";
-        
+            const transactionsQuery = showTransactions ? 
+                `, (SELECT COALESCE(JSON_AGG(JSON_BUILD_OBJECT(${transactionObjStr})), '[]') AS transactions FROM transactions t WHERE c.id=t.customer_id)` : " ";
+            
+            //const transactionsJoin = showTransactions ? "LEFT JOIN transactions t ON c.id=t.customer_id " : " ";
+            
 
-        const customers = await this.table
-        .customQuery(`SELECT c.id, c.email, c.name, c.metadata \
-                        ${transactionsQuery}
-                        FROM customers c ${transactionsJoin}\
-                        WHERE c.client_id=$1 GROUP BY c.id`, [this.issuerId]);
+            const customers = await this.table
+            .customQuery(`WITH customer_aggregates AS (SELECT c.id, c.email, c.name, c.metadata, c.created_at,\
+            COALESCE(SUM(t.amount), 0) AS total_spend, COUNT(t.id) AS total_transactions, MAX(t.created_at) AS last_transaction\
+            ${transactionsQuery} \
+            FROM customers c LEFT JOIN transactions t ON c.id = t.customer_id\
+            WHERE c.client_id = $1 GROUP BY c.id )\
+            SELECT \
+            JSON_BUILD_OBJECT(\
+            'total', COUNT(*),\
+            'customers', COALESCE(JSON_AGG(JSON_BUILD_OBJECT(\
+                        'id', ca.id,\
+                        'email', ca.email,\
+                        'name', ca.name,\
+                        'metadata', ca.metadata,\
+                        'created_at', ca.created_at,\
+                        'total_spend', ca.total_spend,\
+                        'total_transactions', ca.total_transactions,\
+                        'last_transaction', ca.last_transaction\
+                        ${showTransactions ? `,'transactions', ca.transactions` : ""})), '[]')\
+            ) FROM\
+            customer_aggregates ca`, [this.issuerId]);
         // .select({
         //     cols: ["id", "email", "name", "metadata", "created_at", "updated_at"],
         //     conditions: {
@@ -102,8 +118,13 @@ export default class Customers {
         // });
 
 
-        return customers['rows'];
+        return customers['rows'][0]['json_build_object'];
+        }
 
+        catch(error) {
+            console.error(error);
+            throw error;
+        }
     }
 
     async get({id} : {id?: string}){ // id can be ID or email
@@ -113,18 +134,38 @@ export default class Customers {
 
         const transactionObjStr = TRANSACTION_COLS.map((col) => `'${col}', t.${col}`).join(',')
 
+        const transactionsQuery = `, (SELECT COALESCE(JSON_AGG(JSON_BUILD_OBJECT(${transactionObjStr})), '[]') AS transactions FROM transactions t WHERE c.id=t.customer_id)`;
+
+
         const conditionVar = isValidUUID(id) ? "c.id" : "c.email";
 
-        const customer = await this.table.customQuery(`SELECT c.id, c.email, c.name, c.metadata, \
-                        CASE WHEN COUNT(t.id) = 0 THEN '[]'::JSON ELSE
-                        JSON_AGG(JSON_BUILD_OBJECT(${transactionObjStr})) END AS transactions, c.created_at \
-                        FROM customers c LEFT JOIN transactions t ON c.id=t.customer_id \
-                        WHERE c.client_id=$1 AND ${conditionVar}=$2 GROUP BY c.id`, [this.issuerId, id]);
-       
+
+        const customer = await this.table
+            .customQuery(`WITH customer_aggregates AS (SELECT c.id, c.email, c.name, c.metadata, c.created_at,\
+            COALESCE(SUM(t.amount), 0) AS total_spend, COUNT(t.id) AS total_transactions, MIN(t.created_at) AS first_transaction, MAX(t.created_at) AS last_transaction\
+            ${transactionsQuery} \
+            FROM customers c LEFT JOIN transactions t ON c.id = t.customer_id\
+            WHERE c.client_id = $1 AND ${conditionVar}=$2 GROUP BY c.id )\
+            SELECT \
+            JSON_BUILD_OBJECT(\
+                        'id', ca.id,\
+                        'email', ca.email,\
+                        'name', ca.name,\
+                        'metadata', ca.metadata,\
+                        'created_at', ca.created_at,\
+                        'total_spend', ca.total_spend,\
+                        'total_transactions', ca.total_transactions,\
+                        'last_transaction', ca.last_transaction,\
+                        'first_transaction', ca.first_transaction,\
+                        'transactions', ca.transactions), '[]'\
+             FROM\
+            customer_aggregates ca`, [this.issuerId, id]);
+
+
         if(isEmpty(customer['rows'])) return;
 
 
-        return customer['rows'][0]; //removeKeys(customer[0] as GWObject, ["client_id"]);
+        return customer['rows'][0]['json_build_object']; //removeKeys(customer[0] as GWObject, ["client_id"]);
     }
 
     

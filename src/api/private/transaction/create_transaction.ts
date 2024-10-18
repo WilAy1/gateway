@@ -3,6 +3,7 @@ import express, { Request } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { getDepositAddress, generatePaymentUrl, fetchTransaction } from './generate_payment_url';
 import { TransactionStatus } from '../../../interfaces/TransactionStatus';
+import { TransactionDB } from '../../../db/transactions/transactions.db';
 
 export const createTransactionRouter = express.Router();
 
@@ -75,6 +76,25 @@ createTransactionRouter.post('/create', async (req, res) => {
     }
 });
 
+
+createTransactionRouter.post('/cancel', async (req, res) => {
+    try {
+        const { transaction_id } = req.body;
+
+        const transaction = new TransactionDB();
+        const response = await transaction.cancelTransaction({id: transaction_id});
+        
+        res.status(response ? StatusCodes.OK : StatusCodes.BAD_GATEWAY).json({
+            success: response,
+            message: response ? "success": "Failed to cancel transaction",
+            data: {}
+        })
+    }
+    catch {
+        //
+    }
+})
+
 createTransactionRouter.post('/generate-address', async (req, res) => {
     try {
         const issuer = req["user"];
@@ -84,7 +104,7 @@ createTransactionRouter.post('/generate-address', async (req, res) => {
         const response = await getDepositAddress(issuer, params);
 
         if(response.status == false) {
-            return res.status(StatusCodes.BAD_REQUEST).json({ error: response.error, message: response.message });
+            return res.status(StatusCodes.BAD_REQUEST).json({ success: false, error: response.error, message: response.message });
         }
 
         return res.status(StatusCodes.OK).json({

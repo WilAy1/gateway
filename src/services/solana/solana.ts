@@ -6,7 +6,7 @@ import Table from "../../db/query";
 import { GWObject, isEmpty } from "../../utils/utils";
 
 export default class Solana {
-    async generate(isToken){
+    async generate({ isToken }: { isToken: boolean; }){
         try {
             const keyPair = web3.Keypair.generate();
           
@@ -55,7 +55,7 @@ export default class Solana {
         );
     }
 
-    async getParsedTransaction(signature){
+    async getParsedTransaction({ signature }: { signature: string; }){
         try {
             const solana = new web3.Connection("https://devnet.helius-rpc.com/?api-key=1cda3a5d-09d7-4cc3-b8c8-ac12f40d2270");
             const transaction = await solana.getParsedTransaction(
@@ -68,7 +68,7 @@ export default class Solana {
         }
         catch(error){
             console.error(error);
-            this.getParsedTransaction(signature);
+            this.getParsedTransaction({ signature });
             //throw new Error("Error fetching parsed transaction");
         }
     }
@@ -103,7 +103,7 @@ export default class Solana {
     async parse(logs, isToken = false){
         const { signature } = logs;
         if(signature){
-            const parsedTransaction = await this.getParsedTransaction(signature);
+            const parsedTransaction = await this.getParsedTransaction({ signature });
             if(parsedTransaction) {
                 const transaction = new SolanaTransactions();
                 if(!isToken){
