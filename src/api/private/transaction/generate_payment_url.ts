@@ -33,7 +33,7 @@ function initializeDepositTransaction(params){
 
 
 
-
+// no need for issuer
 export async function getDepositAddress(issuer: Map<string, unknown>, params: GenerateAddressParams ) {
     //
     try {
@@ -260,7 +260,7 @@ export async function fetchTransaction(issuer: Map<string, unknown>, params) {
     }
 }
 
-
+// issuer needed
 export async function generatePaymentUrl(issuer: Map<string, unknown>, params: InitTransactionParams){
     try {
         // expected params
@@ -375,6 +375,7 @@ function generateTransactionReference() : string {
 
 async function currencyExists(currency: string) : Promise<boolean> {
     const query = new Table("available_currencies");
+    query.select({}).then((result)=>{ console.log(result) });
     const result = await query.select({
         conditions: {
             compulsory: [

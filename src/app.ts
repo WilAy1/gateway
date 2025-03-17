@@ -11,8 +11,7 @@ import { StatusCodes } from 'http-status-codes';
 const app = express();
 const port = 3000;
 
-// eslint-disable-next-line no-constant-condition
-if(false){
+
 
 resubscribe();
 
@@ -24,7 +23,7 @@ const rates = new Rates();
 setInterval(rates.fetchRates.bind(rates) , 60000);
 
 rates.fetchRates();
-}
+
 app.use(cors())
 app.use(express.json());
 

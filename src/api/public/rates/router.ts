@@ -88,6 +88,7 @@ type GetRateParams = {
 
 
 export const getConversionRate = async (params: GetRateParams) => {
+    try {
 
         let amount_to: number;
 
@@ -116,6 +117,10 @@ export const getConversionRate = async (params: GetRateParams) => {
             rate_from_id: rate_from.id,
             rate_to_id: rate_to.id
         };
+    }
+    catch {
+        return {rate: null};
+    }
 }
 
 
@@ -131,6 +136,13 @@ ratesRouter.get('/rate/:from/:to', async (req, res) => {
 
         const {rate, amount_from, amount_to, rate_from_id, rate_to_id} = await getConversionRate({from: from, to: to, amount: amount});
 
+        if(!rate){
+            return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+                status: false,
+                message: "An error occured while fetching rates",
+                data: null
+            })
+        }
         // const from_to_usd = FIAT_USD[from];
         // const usd_to_coin = CRYPTO_USD[to];
 

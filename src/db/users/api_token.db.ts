@@ -1,15 +1,26 @@
-import { generateApiBearerToken } from "../../utils/generate_secure_token";
+import { generateToken, TokenType } from "../../utils/generate_secure_token";
 import { isEmpty } from "../../utils/utils";
 import Table from "../query";
 
-export async function generateApiToken(userId: string) : Promise<string> {
+export async function generateApiToken(userId: string, tokenType: TokenType) : Promise<string> {
     try {
 
-        const apiToken = generateApiBearerToken({
+        const apiToken = generateToken(tokenType, {
             userId: userId
         });
 
-        const query = new Table("apitokens");
+        let inTable: string;
+        if(tokenType == TokenType.PRIVATE_API){
+            inTable = "apitokens"
+        }
+        else if(tokenType == TokenType.PUBLIC_API) {
+            inTable = "public_apitokens";
+        }
+        else {
+            throw Error("Invalid token type");
+        }
+
+        const query = new Table(inTable); 
 
         await query.update(
             [
@@ -49,6 +60,7 @@ export async function generateApiToken(userId: string) : Promise<string> {
         throw new Error("Failed to generate api token")
     }
 }
+
 
 
 export async function verifyApiToken(userDetails, token: string) : Promise<boolean>{

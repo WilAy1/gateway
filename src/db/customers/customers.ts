@@ -134,14 +134,18 @@ export default class Customers {
 
         const transactionObjStr = TRANSACTION_COLS.map((col) => `'${col}', t.${col}`).join(',')
 
-        const transactionsQuery = `, (SELECT COALESCE(JSON_AGG(JSON_BUILD_OBJECT(${transactionObjStr})), '[]') AS transactions FROM transactions t WHERE c.id=t.customer_id)`;
+        const transactionsQuery = `, (SELECT COALESCE(JSON_AGG(JSON_BUILD_OBJECT(${transactionObjStr})), '[]') AS transactions FROM ordered_transactions t WHERE c.id=t.customer_id)`;
 
 
         const conditionVar = isValidUUID(id) ? "c.id" : "c.email";
 
 
         const customer = await this.table
-            .customQuery(`WITH customer_aggregates AS (SELECT c.id, c.email, c.name, c.metadata, c.created_at,\
+            .customQuery(`WITH ordered_transactions AS (
+            SELECT t.* \
+            FROM transactions t \
+            WHERE t.customer_id = $2\
+            ORDER BY t.created_at DESC), customer_aggregates AS (SELECT c.id, c.email, c.name, c.metadata, c.created_at,\
             COALESCE(SUM(t.amount), 0) AS total_spend, COUNT(t.id) AS total_transactions, MIN(t.created_at) AS first_transaction, MAX(t.created_at) AS last_transaction\
             ${transactionsQuery} \
             FROM customers c LEFT JOIN transactions t ON c.id = t.customer_id\
@@ -177,7 +181,7 @@ export default class Customers {
         return customer.transactions;
     }
 
-    async customerExists({id}: {id?: string}) : Promise<boolean>{
+    async customerExists({id}: {id?: string}) : Promise<string | boolean>{
         const conditions = [
             {
                 key: "client_id",
@@ -207,7 +211,9 @@ export default class Customers {
             }
         });
 
-        return !isEmpty(customer);
+        if(isEmpty(customer)) return false
+
+        return customer[0]['id'];
     }
 
     

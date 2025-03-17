@@ -4,7 +4,7 @@ import { comparePassword, hashPassword } from "../../utils/passwordUtils";
 import { codeGenerator, generateRandomHash, isEmpty, isValidEmail, isValidPassword } from "../../utils/utils";
 import Table from "../query";
 import pool from "../connect";
-import { generateLoginBearerToken } from "../../utils/generate_secure_token";
+import { generateToken, TokenType } from "../../utils/generate_secure_token";
 
 
 export async function authRegister(email: string, password: string) : Promise<UserRegisterResponse> {
@@ -327,7 +327,7 @@ export async function authenticateLogin( params: UserLoginParams ) : Promise<Use
 
         // generate jwt token for account auth
         
-        const bearerToken = generateLoginBearerToken(
+        const bearerToken = generateToken(TokenType.LOGIN,
             {
                 userId: result[0]["user_id"],
                 deviceId: params.deviceId,

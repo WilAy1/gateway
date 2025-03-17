@@ -101,8 +101,8 @@ class TransactionsDBQueries {
                         key: "id",
                         value: transactionId as unknown
                     }
-                ].concat(conditions.compulsory || []),
-                optional: conditions.optional || []
+                ].concat(conditions?.compulsory || []),
+                optional: conditions?.optional || null
             });
 
             return true;

@@ -4,6 +4,8 @@ import { StatusCodes } from 'http-status-codes';
 import { getDepositAddress, generatePaymentUrl, fetchTransaction } from './generate_payment_url';
 import { TransactionStatus } from '../../../interfaces/TransactionStatus';
 import { TransactionDB } from '../../../db/transactions/transactions.db';
+import { Condition, OrderDirection } from '../../../interfaces/db.interface';
+import Customers from '../../../db/customers/customers';
 
 export const createTransactionRouter = express.Router();
 
@@ -16,6 +18,109 @@ export const createTransactionRouter = express.Router();
 
 //     return res.status(StatusCodes.OK).json({});
 // })
+
+
+createTransactionRouter.get('/all', async (req, res) => {
+    try {
+        const issuer = req['user'];
+
+        const { limit, offset, status, from_customer } = req.query;
+
+        const trasaction = new TransactionDB(issuer.userId);
+        
+
+        const conditions: Condition = {
+            compulsory: [
+                {
+                    key: "issuer_id",
+                    value: issuer.userId
+                }
+            ],
+            limit: limit ? parseInt(limit as string) : 100,
+            offset: offset ? parseInt(offset as string) : 0,
+            orderBy: ["created_at"],
+            orderDir: OrderDirection.DESCENDING
+        }
+
+        if(status){
+            switch(status){
+                case "pending":
+                    conditions.optional = [
+                        {key: "status", value: "initialized"},
+                        {key: "status", value: "awaiting_payment"},
+                        {key: "status", value: "awaiting_confirmation"},
+                    ];
+                    break;
+                default:
+                    conditions.compulsory.push({key: "status", value: status});
+            }
+        }
+
+        if(from_customer){
+            const customer = new Customers(issuer.userId);
+            const exists = await customer.customerExists({id: from_customer.toString()});
+            if(!exists){
+                return res.status(StatusCodes.NOT_FOUND).json({
+                    success: false,
+                    message: "Error fetching transactions",
+                })
+            }
+            conditions.compulsory.push({key: "customer_id", value: exists})
+        }
+
+
+        const response = await trasaction.fetchTransactions({
+            cols: [
+                "id",
+                "type",
+                "amount",
+                "currency",
+                "reference",
+                "description",
+                "created_at",
+                "completed_at",
+                "cancelled_at",
+                "cancellation_reason",
+                "status",
+                "payment_method",
+                "payment_channel",
+                "customer_id",
+                "customer_email",
+                "customer_metadata",
+                "metadata",
+                "chain",
+                "deposit_address",
+                "coin",
+                "exchange_rate",
+                "onchain_transaction_hash",
+                "onchain_status",
+                "coin_price_usd",
+                "currency_price_usd",
+                "amount_to_pay",
+                "deposit_received_at",
+                "address_generated_at"
+            ],
+            conditions: conditions
+        });
+
+        if(!response) {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                success: false,
+                message: "Error fetching transactions"
+            })
+        }
+
+        return res.status(StatusCodes.OK).json({
+            success: true,
+            message: "success",
+            data: response
+        });
+        
+    }
+    catch(error) {
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "Internal Server Error" });    
+    }
+})
 
 
 createTransactionRouter.get('/fetch', async (req, res) => {
