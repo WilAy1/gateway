@@ -20,7 +20,7 @@ export const createTransactionRouter = express.Router();
 // })
 
 
-createTransactionRouter.get('/all', async (req, res) => {
+export async function fnFetchAllTransaction(req, res) {
     try {
         const issuer = req['user'];
 
@@ -120,10 +120,10 @@ createTransactionRouter.get('/all', async (req, res) => {
     catch(error) {
         return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "Internal Server Error" });    
     }
-})
+}
 
 
-createTransactionRouter.get('/fetch', async (req, res) => {
+export async function fnFetchParticularTransaction(req, res){
     try {
         const issuer = req['user'];
 
@@ -148,7 +148,12 @@ createTransactionRouter.get('/fetch', async (req, res) => {
     catch(error) {
         return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "Internal Server Error" });    
     }
-})
+}
+
+createTransactionRouter.get('/all', fnFetchAllTransaction)
+
+
+createTransactionRouter.get('/fetch', fnFetchParticularTransaction);
 
 
 createTransactionRouter.post('/create', async (req, res) => {

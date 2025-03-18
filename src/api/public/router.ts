@@ -1,5 +1,5 @@
 import express from 'express';
-import { coinsRouter } from './crypto/coins/router';
+import { coinsRouter } from './coins/router';
 import { ratesRouter } from './rates/router';
 
 export const publicRouter = express.Router();

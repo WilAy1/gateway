@@ -107,7 +107,7 @@ export const getConversionRate = async (params: GetRateParams) => {
         if(amount) { 
             amount_to = amount * rate;
         }
-
+        
         return {
             price_from: from_to_usd,
             amount_from: amount,

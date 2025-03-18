@@ -2,6 +2,65 @@ import { generateToken, TokenType } from "../../utils/generate_secure_token";
 import { isEmpty } from "../../utils/utils";
 import Table from "../query";
 
+
+export class Tokens {
+    private readonly privateTable: Table;
+    private readonly publicTable: Table;
+    private readonly ownerId: string;
+    constructor(userId: string){
+        this.privateTable = new Table("apitokens");
+        this.publicTable = new Table("public_apitokens");
+        this.ownerId = userId;
+    }
+
+    async generatePrivate(){
+ 
+    }
+
+    generatePublic(){
+        
+    }
+
+    async getPrivate() {
+        const result = await this.privateTable.select({
+            cols: ["api_token as token", "status", "owner_id as id", "created_at"],
+            conditions: {
+                compulsory: [
+                    {
+                        key: "owner_id",
+                        value: this.ownerId
+                    }
+                ]
+            }
+        });
+
+        return result;
+    }
+    async getPublic() {
+        const result = await this.publicTable.select({
+            cols: ["api_token as token", "status", "owner_id as id", "created_at"],
+            conditions: {
+                compulsory: [
+                    {
+                        key: "owner_id",
+                        value: this.ownerId
+                    }
+                ]
+            }
+        });
+
+        return result;
+    }
+
+    async get(){
+        return {
+            "private": await this.getPrivate(),
+            "public": await this.getPublic()
+        };
+    }
+}
+
+
 export async function generateApiToken(userId: string, tokenType: TokenType) : Promise<string> {
     try {
 
@@ -63,20 +122,21 @@ export async function generateApiToken(userId: string, tokenType: TokenType) : P
 
 
 
-export async function verifyApiToken(userDetails, token: string) : Promise<boolean>{
+
+export async function isValidApiToken(userDetails, token: string, tokenType: TokenType) : Promise<boolean>{
     try {
         const { userId } = userDetails;
         
-        const query = new Table("apitokens");
+        const query = new Table(tokenType == TokenType.PRIVATE_API ? "apitokens" : "public_apitokens");
         const result = await query.select({
             conditions: {
                 compulsory: [
                     {
-                        key: "user_id",
+                        key: "owner_id",
                         value: userId
                     },
                     {
-                        key: "token",
+                        key: "api_token",
                         value: token
                     },
                     {
@@ -86,6 +146,7 @@ export async function verifyApiToken(userDetails, token: string) : Promise<boole
                 ]
             }
         });
+
 
         if (isEmpty(result)){
             return false;

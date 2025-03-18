@@ -1,9 +1,9 @@
 import express from 'express';
 import { StatusCodes } from 'http-status-codes';
-import { fetchCoin, fetchCoins } from '../../../../db/crypto/functions.db';
-import { isEmpty, isValidUUID } from '../../../../utils/utils';
+import { fetchCoin, fetchCoins } from '../../../db/crypto/functions.db';
+import { isEmpty, isValidUUID } from '../../../utils/utils';
 import { solanaCoinRouter } from './solana/router';
-import { Chain } from '../../../../interfaces/coins';
+import { Chain } from '../../../interfaces/coins';
 
 export const coinsRouter = express.Router();
 

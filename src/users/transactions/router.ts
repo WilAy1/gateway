@@ -1,12 +1,17 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import express from 'express';
 import UserTransactions from '../../db/transactions/user.transactions.db';
 import { OrderDirection } from '../../interfaces/db.interface';
 import { StatusCodes } from 'http-status-codes';
 import { removeKeys } from '../../utils/utils';
+import { fnFetchAllTransaction, fnFetchParticularTransaction } from '../../api/private/transaction/create_transaction';
 
 export const userTransactionRouter = express.Router();
 
-userTransactionRouter.get('/all', async (req, res)=>{
+userTransactionRouter.get('/all', fnFetchAllTransaction)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function asyncd (req, res){
+
     const { limit, offset } = req.query;
 
     
@@ -63,40 +68,40 @@ userTransactionRouter.get('/all', async (req, res)=>{
 
 
     return res.status(200).json(transactions);
-});
+}
 
 
 
+userTransactionRouter.get("/fetch", fnFetchParticularTransaction);
+// userTransactionRouter.get("/fetch:id", async (req, res) => {
+//     const { id } = req.params;
 
-userTransactionRouter.get("/:id", async (req, res) => {
-    const { id } = req.params;
+//     if(!id){
+//         return res.status(StatusCodes.BAD_REQUEST).json({
+//             error: "Invalid transaction ID"
+//         });
+//     }
 
-    if(!id){
-        return res.status(StatusCodes.BAD_REQUEST).json({
-            error: "Invalid transaction ID"
-        });
-    }
+//     try {
+//         const { userId } = req["user"];
 
-    try {
-        const { userId } = req["user"];
+//         const userTransactions = new UserTransactions(userId);
+//         const transaction = await userTransactions.fetchTransaction(id);
 
-        const userTransactions = new UserTransactions(userId);
-        const transaction = await userTransactions.fetchTransaction(id);
+//         if(!transaction){
+//             return;
+//         }
 
-        if(!transaction){
-            return;
-        }
+//         const serializedTransactions = removeKeys(transaction, ["issuer_id", "application_fee", "fees_denomination", "device_type", "useragent", "ipaddress", "callback_url"])
 
-        const serializedTransactions = removeKeys(transaction, ["issuer_id", "application_fee", "fees_denomination", "device_type", "useragent", "ipaddress", "callback_url"])
-
-        return res.status(StatusCodes.OK).json(serializedTransactions);
-    }
-    catch (error){
-        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-            error: "Server error"
-        });
-    }
-})
+//         return res.status(StatusCodes.OK).json(serializedTransactions);
+//     }
+//     catch (error){
+//         return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+//             error: "Server error"
+//         });
+//     }
+// })
 
 
 //customers, transactions

@@ -375,7 +375,7 @@ function generateTransactionReference() : string {
 
 async function currencyExists(currency: string) : Promise<boolean> {
     const query = new Table("available_currencies");
-    query.select({}).then((result)=>{ console.log(result) });
+    query.select({}).then((result)=>{ /*console.log(result)*/ });
     const result = await query.select({
         conditions: {
             compulsory: [
