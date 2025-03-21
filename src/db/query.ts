@@ -144,7 +144,6 @@ class Table {
     // global
 
     async update(keys: unknown[], values: unknown[], conditions: Condition) : Promise<boolean> {
-        console.log(conditions)
         try {
             if(keys.length == 0 && keys.length != values.length && !(conditions.compulsory || conditions.optional)) {
                 throw new Error("Length of keys doesn't match length of values or no condition provided");

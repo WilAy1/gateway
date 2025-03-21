@@ -20,7 +20,7 @@ export const createTransactionRouter = express.Router();
 // })
 
 
-export async function fnFetchAllTransaction(req, res) {
+export async function fnAllTransaction(req, res) {
     try {
         const issuer = req['user'];
 
@@ -123,7 +123,7 @@ export async function fnFetchAllTransaction(req, res) {
 }
 
 
-export async function fnFetchParticularTransaction(req, res){
+export async function fnParticularTransaction(req, res){
     try {
         const issuer = req['user'];
 
@@ -150,10 +150,10 @@ export async function fnFetchParticularTransaction(req, res){
     }
 }
 
-createTransactionRouter.get('/all', fnFetchAllTransaction)
+createTransactionRouter.get('/all', fnAllTransaction)
 
 
-createTransactionRouter.get('/fetch', fnFetchParticularTransaction);
+createTransactionRouter.get('/fetch', fnParticularTransaction);
 
 
 createTransactionRouter.post('/create', async (req, res) => {

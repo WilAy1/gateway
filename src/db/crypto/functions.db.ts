@@ -2,6 +2,7 @@ import { QueryResult } from "pg";
 import { Chain, UnitCoin } from "../../interfaces/coins";
 import { ChainDetails, CoinDetails } from "../../interfaces/db.interface";
 import Table from "../query";
+import { isEmpty } from "../../utils/utils";
 
 
 export async function isChainActive( params: ChainDetails ) : Promise<boolean> {
@@ -26,6 +27,7 @@ export async function isChainActive( params: ChainDetails ) : Promise<boolean> {
         return false;
     }
 }
+
 
 export async function fetchCoins( params?: CoinDetails) : Promise<Chain> {
     try {
@@ -91,9 +93,45 @@ export async function fetchCoins( params?: CoinDetails) : Promise<Chain> {
     }
 }
 
-export async function fetchCoin(coinId:string) : Promise<Array<UnitCoin>> {
+interface CoinWithName {
+    coinName: string,
+    chainName: string
+}
+
+export async function fetchCoin(coinId?:string, params?: CoinWithName) : Promise<UnitCoin> {
     try {
         const query = new Table("available_coins");
+        const compulsoryConditions = [{
+            key: "status",
+            value: "active"
+        }]
+        if(params && !coinId){
+            const chainDetails = await fetchChain(params.chainName)
+            if(chainDetails){
+                compulsoryConditions.push(
+                    {
+                        key: "chain_id",
+                        value: chainDetails["chain_id"]
+                    },
+                    {
+                        key: "coin",
+                        value: params.coinName
+                    }
+                )
+            }
+        }
+        else {
+            compulsoryConditions.push(
+                {
+                    key: "coin_id",
+                    value: coinId
+                }
+            )
+        }
+
+        if(compulsoryConditions.length < 2) return null
+
+
         const result = await query.select({
             cols: [
                 "coin_id",
@@ -102,23 +140,34 @@ export async function fetchCoin(coinId:string) : Promise<Array<UnitCoin>> {
                 "chain_id"
             ],
             conditions: {
-                compulsory: [
-                    {
-                        key: "status",
-                        value: "active"
-                    },
-                    {
-                        key: "coin_id",
-                        value: coinId
-                    }
-                ]
+                compulsory: compulsoryConditions
             }
         }) as UnitCoin[];
 
-        return result;
+        return result[0] || null;
     }
     catch(error) {
         console.error("Error fetching coin:", error);
         throw new Error("An error occurred while fetching requested coin");
     }
+}
+
+
+export async function fetchChain(chainName: string) {
+    const table = new Table("available_chains");
+    const result = await table.select({
+        cols: ["chain_id", "chain"],
+        conditions: {
+            compulsory: [
+                {
+                    key: "chain",
+                    value: chainName
+                }
+            ]
+        }
+    })
+    
+    if(isEmpty(result)) return null;
+
+    return result[0];
 }

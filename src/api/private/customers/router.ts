@@ -75,7 +75,7 @@ customersRouter.patch('/update/:id', async (req, res) => {
     });
 })
 
-customersRouter.get('/all', async (req, res) => {
+export async function fnAllCustomers (req, res) {
     const issuer = req['user'];
 
     const { transactions } = req.query;
@@ -97,9 +97,9 @@ customersRouter.get('/all', async (req, res) => {
         message: "success",
         data: response
     })
-})
+}
 
-customersRouter.get('/:id', async (req, res) => {
+export async function fnParticularCustomer(req, res) {
     const { id } = req.params;
     const issuer = req['user'];
 
@@ -124,10 +124,9 @@ customersRouter.get('/:id', async (req, res) => {
         message: "success",
         data: response
     })
-});
+}
 
-
-customersRouter.get('/:id/transactions', async (req, res) => {
+export async function fnCustomerTransactions(req, res) {
     const { id } = req.params;
     const issuer = req['user'];
 
@@ -152,4 +151,10 @@ customersRouter.get('/:id/transactions', async (req, res) => {
         message: "success",
         data: response
     })
-});
+}
+
+customersRouter.get('/all', fnAllCustomers)
+
+customersRouter.get('/:id', fnParticularCustomer);
+
+customersRouter.get('/:id/transactions', fnCustomerTransactions);

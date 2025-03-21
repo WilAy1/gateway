@@ -66,7 +66,7 @@ coinsRouter.get('/coin/:id', async (req, res) => {
     try {
         const coin = await fetchCoin(COIN_ID);
 
-        if(coin.length === 0) return res.status(StatusCodes.NOT_FOUND).json({ error: 'Coin not found' });
+        if(!coin) return res.status(StatusCodes.NOT_FOUND).json({ error: 'Coin not found' });
 
         const response = {
             status: true,

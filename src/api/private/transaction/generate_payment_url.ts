@@ -105,6 +105,16 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
                 return { status: false, error: "address_error", message: "Failed to generate deposit address" };
             }
 
+            const coinDetails = await fetchCoin(null, { chainName: chain, coinName: coin });
+            if(!coinDetails) return {
+                status : false,
+                error: "coin_chain_error",
+                message : "Invalid coin/chain used",
+            }
+
+            const contract_address = coinDetails['contract_address'];
+
+
 
 
             // change status to  awaiting_payment
@@ -124,7 +134,8 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
                 "deposit_address",
                 "amount_to_pay",
                 "status",
-                "address_generated_at"
+                "address_generated_at",
+                "coin_contract_address",
             ], [
                     chain,
                     coin,
@@ -135,7 +146,8 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
                     depositAddress,
                     amount_to,
                     status,
-                    address_generated_at
+                    address_generated_at,
+                    contract_address
                 ], {
                     compulsory: [{
                         key: "id",

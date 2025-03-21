@@ -4,11 +4,11 @@ import UserTransactions from '../../db/transactions/user.transactions.db';
 import { OrderDirection } from '../../interfaces/db.interface';
 import { StatusCodes } from 'http-status-codes';
 import { removeKeys } from '../../utils/utils';
-import { fnFetchAllTransaction, fnFetchParticularTransaction } from '../../api/private/transaction/create_transaction';
+import { fnAllTransaction, fnParticularTransaction } from '../../api/private/transaction/create_transaction';
 
 export const userTransactionRouter = express.Router();
 
-userTransactionRouter.get('/all', fnFetchAllTransaction)
+userTransactionRouter.get('/all', fnAllTransaction)
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function asyncd (req, res){
 
@@ -72,7 +72,7 @@ async function asyncd (req, res){
 
 
 
-userTransactionRouter.get("/fetch", fnFetchParticularTransaction);
+userTransactionRouter.get("/fetch", fnParticularTransaction);
 // userTransactionRouter.get("/fetch:id", async (req, res) => {
 //     const { id } = req.params;
 
