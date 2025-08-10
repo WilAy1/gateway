@@ -54,6 +54,7 @@ export async function fetchCoins( params?: CoinDetails) : Promise<Chain> {
             }
             data[chainName].coins.push({
                 id: row.coin_id,
+                coin_id: row.coin_id,
                 coin: row.coin,
                 contract_address: row.contract_address,
             });

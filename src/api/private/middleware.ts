@@ -5,7 +5,7 @@ import { isValidApiToken } from '../../db/users/api_token.db';
 import { TokenType } from '../../utils/generate_secure_token';
 
 
-const publicPaths = ['/transaction/create', '/transaction/generate-address'];
+const publicPaths = ['/transaction/create', '/transaction/generate-address', '/transaction/fetch'];
 
 export function authenticate(req, res, next) {
     
@@ -28,7 +28,8 @@ export function authenticate(req, res, next) {
       // Verify the token using the secret key
       jwt.verify(token, env.SECURE_GEN_KEY, async (err, user) => {
         if (!err) {
-          if(await isValidApiToken(user, token, TokenType.PRIVATE_API)){
+          const validToken = await isValidApiToken(user, token, TokenType.PRIVATE_API);
+          if(validToken){
             req.user = user;
             return next(); // Proceed to the next middleware
           }

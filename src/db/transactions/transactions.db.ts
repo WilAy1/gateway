@@ -5,6 +5,8 @@ import { TransactionStatus } from '../../interfaces/TransactionStatus';
 import { ChainTypes } from "../../enums/chain";
 import Solana from "../../services/solana/solana";
 import { Condition, DBSelectParams } from "../../interfaces/db.interface";
+import { fetchCoin } from "../crypto/functions.db";
+import { Webhook, WebhookEvent } from "../../webhook/webhook";
 
 
 class TransactionsDBQueries {
@@ -190,19 +192,36 @@ class TransactionDB extends TransactionsDBQueries {
                     deposit_received_at: depositReceived
                 }
 
+                const coinDetails = await fetchCoin(null, {
+                    coinName: transaction["coin"],
+                    chainName: transaction["chain"]
+                });
+
+                if(!coinDetails){
+                    console.error("Coin details not found for transaction: ", transactionId);
+                    return false;
+                }
+
                 const update = await this.updateTransaction(transactionId, 
                     Object.keys(updateObject),
                     Object.values(updateObject)
                 )
-
-
+                
                 //await subscribe();
 
-                if(update) {
-                    const wallet = new WalletDB({ userId: this.issuer });
-                    await wallet.credit(amount_to_credit, CREDIT_REASONS.transaction_completed, transactionId);
-                    return true;
-                }
+                if(!update) return false
+
+                const wallet = new WalletDB({ userId: this.issuer });
+                const creditStatus = await wallet.credit(coinDetails.coin_id, amount_to_credit, CREDIT_REASONS.transaction_completed, transactionId);
+                
+                const webhook = new Webhook(this.issuer);
+                webhook.sendTransaction(transactionId, WebhookEvent.TRANSACTION_COMPLETED);
+
+                return creditStatus ?? false;
+                
+
+                
+
             }
             return false;
         }

@@ -85,26 +85,42 @@ export default class Customers {
             
 
             const customers = await this.table
-            .customQuery(`WITH customer_aggregates AS (SELECT c.id, c.email, c.name, c.metadata, c.created_at,\
-            COALESCE(SUM(t.amount), 0) AS total_spend, COUNT(t.id) AS total_transactions, MAX(t.created_at) AS last_transaction\
-            ${transactionsQuery} \
-            FROM customers c LEFT JOIN transactions t ON c.id = t.customer_id\
-            WHERE c.client_id = $1 GROUP BY c.id )\
-            SELECT \
-            JSON_BUILD_OBJECT(\
-            'total', COUNT(*),\
-            'customers', COALESCE(JSON_AGG(JSON_BUILD_OBJECT(\
-                        'id', ca.id,\
-                        'email', ca.email,\
-                        'name', ca.name,\
-                        'metadata', ca.metadata,\
-                        'created_at', ca.created_at,\
-                        'total_spend', ca.total_spend,\
-                        'total_transactions', ca.total_transactions,\
-                        'last_transaction', ca.last_transaction\
-                        ${showTransactions ? `,'transactions', ca.transactions` : ""})), '[]')\
-            ) FROM\
-            customer_aggregates ca`, [this.issuerId]);
+                    .customQuery(`
+                    WITH customer_aggregates AS (
+                        SELECT 
+                            c.id, 
+                            c.email, 
+                            c.name, 
+                            c.metadata, 
+                            c.created_at,
+                            -- Only consider transactions where the status is 'completed'
+                            COALESCE(SUM(CASE WHEN t.status = 'completed' THEN t.amount ELSE 0 END), 0) AS total_spend,
+                            COUNT(t.id) AS total_transactions,
+                            MAX(t.created_at) AS last_transaction
+                            ${transactionsQuery}
+                        FROM customers c
+                        LEFT JOIN transactions t ON c.id = t.customer_id
+                        WHERE c.client_id = $1
+                        GROUP BY c.id
+                    )
+                    SELECT 
+                        JSON_BUILD_OBJECT(
+                            'total', COUNT(*),
+                            'customers', COALESCE(JSON_AGG(JSON_BUILD_OBJECT(
+                                'id', ca.id,
+                                'email', ca.email,
+                                'name', ca.name,
+                                'metadata', ca.metadata,
+                                'created_at', ca.created_at,
+                                'total_spend', ca.total_spend,
+                                'total_transactions', ca.total_transactions,
+                                'last_transaction', ca.last_transaction
+                                ${showTransactions ? `,'transactions', ca.transactions` : ""}
+                            )), '[]')
+                        ) 
+                    FROM customer_aggregates ca
+            `, [this.issuerId]);
+
         // .select({
         //     cols: ["id", "email", "name", "metadata", "created_at", "updated_at"],
         //     conditions: {
@@ -141,29 +157,48 @@ export default class Customers {
 
 
         const customer = await this.table
-            .customQuery(`WITH ordered_transactions AS (
-            SELECT t.* \
-            FROM transactions t \
-            WHERE t.customer_id = $2\
-            ORDER BY t.created_at DESC), customer_aggregates AS (SELECT c.id, c.email, c.name, c.metadata, c.created_at,\
-            COALESCE(SUM(t.amount), 0) AS total_spend, COUNT(t.id) AS total_transactions, MIN(t.created_at) AS first_transaction, MAX(t.created_at) AS last_transaction\
-            ${transactionsQuery} \
-            FROM customers c LEFT JOIN transactions t ON c.id = t.customer_id\
-            WHERE c.client_id = $1 AND ${conditionVar}=$2 GROUP BY c.id )\
-            SELECT \
-            JSON_BUILD_OBJECT(\
-                        'id', ca.id,\
-                        'email', ca.email,\
-                        'name', ca.name,\
-                        'metadata', ca.metadata,\
-                        'created_at', ca.created_at,\
-                        'total_spend', ca.total_spend,\
-                        'total_transactions', ca.total_transactions,\
-                        'last_transaction', ca.last_transaction,\
-                        'first_transaction', ca.first_transaction,\
-                        'transactions', ca.transactions), '[]'\
-             FROM\
-            customer_aggregates ca`, [this.issuerId, id]);
+                .customQuery(`
+                WITH ordered_transactions AS (
+                    SELECT t.*
+                    FROM transactions t
+                    WHERE t.customer_id = $2
+                    ORDER BY t.created_at DESC
+                ), customer_aggregates AS (
+                    SELECT 
+                        c.id, 
+                        c.email, 
+                        c.name, 
+                        c.metadata, 
+                        c.created_at,
+                        -- Only sum 'completed' transactions
+                        COALESCE(SUM(CASE WHEN t.status = 'completed' THEN t.amount ELSE 0 END), 0) AS total_spend,
+                        -- Only count 'completed' transactions
+                        COUNT(t.id) AS total_transactions,
+                        MIN(t.created_at) AS first_transaction,
+                        MAX(t.created_at) AS last_transaction
+                        ${transactionsQuery}
+                    FROM customers c
+                    LEFT JOIN transactions t ON c.id = t.customer_id
+                    WHERE c.client_id = $1 
+                    AND ${conditionVar} = $2
+                    GROUP BY c.id
+                )
+                SELECT 
+                    JSON_BUILD_OBJECT(
+                        'id', ca.id,
+                        'email', ca.email,
+                        'name', ca.name,
+                        'metadata', ca.metadata,
+                        'created_at', ca.created_at,
+                        'total_spend', ca.total_spend,
+                        'total_transactions', ca.total_transactions,
+                        'last_transaction', ca.last_transaction,
+                        'first_transaction', ca.first_transaction,
+                        'transactions', ca.transactions
+                    ) 
+                FROM customer_aggregates ca
+            `, [this.issuerId, id]);
+
 
 
         if(isEmpty(customer['rows'])) return;

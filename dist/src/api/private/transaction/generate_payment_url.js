@@ -5,11 +5,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generatePaymentUrl = exports.fetchTransaction = exports.getDepositAddress = void 0;
 const create_transaction_1 = require("./create_transaction");
+const TransactionStatus_1 = require("../../../interfaces/TransactionStatus");
 const query_1 = __importDefault(require("../../../db/query"));
 const utils_1 = require("../../../utils/utils");
+const functions_db_1 = require("../../../db/crypto/functions.db");
 const chain_1 = require("../../../enums/chain");
 const router_1 = require("../../public/rates/router");
-const generate_addr_1 = __importDefault(require("../../../crypto/solana/generate_addr"));
+const solana_1 = __importDefault(require("../../../services/solana/solana"));
+const customers_1 = __importDefault(require("../../../db/customers/customers"));
 const PLATFORM_PAYMENT_URL = "http://localhost:3001/pay";
 function initializeDepositTransaction(params) {
     const { amount, currency, coin, chain, refund_address, email } = params;
@@ -23,11 +26,19 @@ function initializeDepositTransaction(params) {
         metadata: params.metadata
     };
 }
+// no need for issuer
 async function getDepositAddress(issuer, params) {
     //
     try {
         let depositAddress;
         const { transaction_id, reference, chain, coin, rates } = params;
+        if (!transaction_id || !reference || !chain || !coin || !rates) {
+            return {
+                status: false,
+                error: "param_error",
+                message: "All parameters aren't available",
+            };
+        }
         const query = new query_1.default("transactions");
         const transactionResult = await query.select({
             conditions: {
@@ -46,6 +57,8 @@ async function getDepositAddress(issuer, params) {
         if ((0, utils_1.isEmpty)(transactionResult))
             return { status: false, error: "transaction_unknown", message: "Couldn't find trasaction" };
         const transaction = transactionResult[0];
+        if (transaction["status"] !== TransactionStatus_1.TransactionStatus.INITIALIZED)
+            return { status: false, message: "Couldn't generate address for transaction" };
         const { rate, amount_to, price_from, price_to } = await (0, router_1.getConversionRate)({
             amount: parseFloat(transaction["amount"]),
             from: transaction["currency"],
@@ -58,9 +71,10 @@ async function getDepositAddress(issuer, params) {
                 message: "Price updated, try again",
             };
         if (transaction["onchain_status"] == null && transaction["deposit_address"] == null) {
+            const solana = new solana_1.default();
             switch (chain) {
                 case chain_1.ChainTypes.SOLANA:
-                    depositAddress = await (0, generate_addr_1.default)();
+                    depositAddress = await solana.generate({ isToken: coin != "sol" });
                     break;
                 default:
                     break;
@@ -68,8 +82,16 @@ async function getDepositAddress(issuer, params) {
             if (!depositAddress) {
                 return { status: false, error: "address_error", message: "Failed to generate deposit address" };
             }
+            const coinDetails = await (0, functions_db_1.fetchCoin)(null, { chainName: chain, coinName: coin });
+            if (!coinDetails)
+                return {
+                    status: false,
+                    error: "coin_chain_error",
+                    message: "Invalid coin/chain used",
+                };
+            const contract_address = coinDetails['contract_address'];
             // change status to  awaiting_payment
-            const status = create_transaction_1.TransactionStatus.AWAITINGPAYMENT;
+            const status = TransactionStatus_1.TransactionStatus.AWAITINGPAYMENT;
             const date = new Date();
             const address_generated_at = date.toISOString();
             await query.update([
@@ -82,7 +104,8 @@ async function getDepositAddress(issuer, params) {
                 "deposit_address",
                 "amount_to_pay",
                 "status",
-                "address_generated_at"
+                "address_generated_at",
+                "coin_contract_address",
             ], [
                 chain,
                 coin,
@@ -93,7 +116,8 @@ async function getDepositAddress(issuer, params) {
                 depositAddress,
                 amount_to,
                 status,
-                address_generated_at
+                address_generated_at,
+                contract_address
             ], {
                 compulsory: [{
                         key: "id",
@@ -196,13 +220,24 @@ async function fetchTransaction(issuer, params) {
     }
 }
 exports.fetchTransaction = fetchTransaction;
+// issuer needed
 async function generatePaymentUrl(issuer, params) {
     try {
         // expected params
         // amount, currency, email
         const { amount, currency, customer, callback_url, description, metadata } = params;
-        if (!amount || !currency || !customer || !customer.email || !(0, utils_1.isValidEmail)(customer.email))
+        if (!amount || !currency || !customer || (!customer.id && !customer.email))
             return { status: false, error: 'invalid_params', message: "Failed to create transaction" };
+        if (customer.id) {
+            const customerObj = new customers_1.default(issuer['userId']);
+            const customerExists = await customerObj.customerExists({ id: customer.id });
+            if (!customerExists && !(0, utils_1.isValidEmail)(customer.email)) {
+                return { status: false, error: 'invalid_params', message: "Failed to create transaction - use a valid customer or enter customer id" };
+            }
+            if (!(0, utils_1.isValidEmail)(customer.email)) {
+                customer.email = customerExists['email'];
+            }
+        }
         const currencyCheck = await currencyExists(currency);
         if (!currencyCheck)
             return { status: false, error: 'invalid_currency', message: "Failed to create transaction" };
@@ -210,7 +245,7 @@ async function generatePaymentUrl(issuer, params) {
         const date = new Date();
         const created_at = date.toISOString();
         const transaction_reference = generateTransactionReference();
-        const transaction_status = create_transaction_1.TransactionStatus.INITIALIZED;
+        const transaction_status = TransactionStatus_1.TransactionStatus.INITIALIZED;
         const transaction_type = 'payment';
         const payment_method = create_transaction_1.PaymentMethod.PLATFORM;
         const keys = [
@@ -235,7 +270,7 @@ async function generatePaymentUrl(issuer, params) {
             amount,
             currency.toLowerCase(),
             transaction_reference,
-            description,
+            description || "Payment",
             created_at,
             transaction_status,
             payment_method,
@@ -245,12 +280,14 @@ async function generatePaymentUrl(issuer, params) {
             metadata,
             callback_url
         ];
-        const result = await query.insert(keys, values);
+        const result = await query.insert(keys, values, { returnColumn: "id" });
         if (result) {
             return {
                 status: true,
                 message: "Transaction generated",
-                payment_url: `${PLATFORM_PAYMENT_URL}/${transaction_reference}`
+                payment_url: `${PLATFORM_PAYMENT_URL}/${transaction_reference}`,
+                id: result['id'],
+                reference: transaction_reference
             };
         }
         return {
@@ -274,6 +311,7 @@ function generateTransactionReference() {
 }
 async function currencyExists(currency) {
     const query = new query_1.default("available_currencies");
+    query.select({}).then((result) => { });
     const result = await query.select({
         conditions: {
             compulsory: [

@@ -272,7 +272,7 @@ async function authenticateLogin(params) {
             });
         }
         // generate jwt token for account auth
-        const bearerToken = (0, generate_secure_token_1.generateLoginBearerToken)({
+        const bearerToken = (0, generate_secure_token_1.generateToken)(generate_secure_token_1.TokenType.LOGIN, {
             userId: result[0]["user_id"],
             deviceId: params.deviceId,
             userAgent: params.userAgent

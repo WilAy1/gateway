@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const utils_1 = require("../utils/utils");
 const connect_1 = __importDefault(require("./connect"));
 /* eslint-disable @typescript-eslint/no-unused-vars */
-class Query {
+class Table {
     constructor(table) {
         this.table = table;
     }
@@ -23,7 +23,7 @@ class Query {
         const optionalConditions = conditions.optional?.map((key, index) => `${key.key} = $${keysLength + index + 1}`);
         let conditionStatement;
         if (optionalConditions && compulsoryConditions) {
-            conditionStatement = `WHERE (${optionalConditions.join(' OR ')}) OR (${compulsoryConditions.join(' AND ')})`;
+            conditionStatement = `WHERE (${optionalConditions.join(' OR ')}) AND (${compulsoryConditions.join(' AND ')})`;
         }
         else if (optionalConditions) {
             conditionStatement = `WHERE (${optionalConditions.join(' OR ')})`;
@@ -33,6 +33,16 @@ class Query {
         }
         else {
             conditionStatement = "";
+        }
+        if (conditions.orderBy) {
+            const orders = conditions.orderBy.join(', ');
+            conditionStatement = conditionStatement.concat(` ORDER BY ${orders} ${conditions.orderDir || "ASC"}`);
+        }
+        if (conditions.limit) {
+            conditionStatement = conditionStatement.concat(` LIMIT ${conditions.limit}`);
+        }
+        if (conditions.offset) {
+            conditionStatement = conditionStatement.concat(` OFFSET ${conditions.offset}`);
         }
         return conditionStatement;
     }
@@ -51,11 +61,12 @@ class Query {
             conditionValues: conditionValues
         };
     }
-    generateInsertQuery(keys, values) {
+    generateInsertQuery(keys, values, returnColumn) {
+        const returnCol = returnColumn ? `RETURNING ${returnColumn}` : '';
         const placeholders = values.map((_, index) => `$${index + 1}`);
         const columns = keys.join(', ');
         const placeholdersString = placeholders.join(', ');
-        return `INSERT INTO ${this.table} (${columns}) VALUES (${placeholdersString})`;
+        return `INSERT INTO ${this.table} (${columns}) VALUES (${placeholdersString}) ${returnCol}`;
     }
     generateUpdateQuery(keys, conditions) {
         const assignment = keys.map((key, index) => `${key} = $${index + 1}`).join(', ');
@@ -107,14 +118,14 @@ class Query {
             return false;
         }
     }
-    async insert(keys, values) {
+    async insert(keys, values, { returnColumn } = { returnColumn: null }) {
         try {
             if (keys.length == 0 && keys.length != values.length) {
                 throw new Error("Length of keys doesn't match length of values");
             }
-            const query = this.generateInsertQuery(keys, values);
-            await connect_1.default.query(query, values); // insert into table
-            return true;
+            const query = this.generateInsertQuery(keys, values, returnColumn);
+            const response = await connect_1.default.query(query, values); // insert into table
+            return response.rows[0];
         }
         catch (error) {
             // failed to insert
@@ -132,7 +143,6 @@ class Query {
             const query = `DELETE FROM ${this.table} ${deleteCondition}`;
             const conditionValues = (conditions.optional?.map((key, _) => key.value) || [])
                 .concat((conditions.compulsory?.map((key, _) => key.value)) || []);
-            console.log(query, conditionValues);
             //const { query, conditionValues } = this.generateCondition(conditions);
             //console.log(query, conditionValues)
             //await pool.query(query, conditionValues); // insert into table
@@ -165,5 +175,5 @@ class Query {
         }
     }
 }
-exports.default = Query;
+exports.default = Table;
 //# sourceMappingURL=query.js.map

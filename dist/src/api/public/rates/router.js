@@ -6,74 +6,34 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getConversionRate = exports.ratesRouter = void 0;
 const express_1 = __importDefault(require("express"));
 const http_status_codes_1 = require("http-status-codes");
-const redis_1 = require("redis");
+const rates_1 = __importDefault(require("../../../services/rates/rates"));
 exports.ratesRouter = express_1.default.Router();
-const client = (0, redis_1.createClient)();
-// fetch rate from api. returns every usd value e.g [{pair:"sol-usd", value: 180}]
-// save the rate with an id
-// on fetch rate, convert it to 
-// client.on('error', (err) => {
-//     console.error('Redis client error:', err);
-//   });
-//   // Connect to Redis
-client.connect().catch(console.error);
-function fetchRatesFromAPI() {
-    const rates = Object.keys(PAIR_USD).map((value) => {
-        return { id: value, rate: PAIR_USD[value] };
-    });
-    return rates;
-}
-// Function to fetch and save rates
-async function fetchAndSaveRates() {
-    try {
-        const rates = fetchRatesFromAPI();
-        for (const rate of rates) {
-            try {
-                // Set rate with 1-hour TTL (60 seconds)
-                await client.setEx(rate.id, 60, JSON.stringify(rate));
-                //console.log(`Rate for ${rate.id} saved successfully.`);
-            }
-            catch (err) {
-                console.error(`Failed to save rate for ${rate.id}:`, err);
-            }
-        }
-    }
-    catch (error) {
-        //console.error('Error fetching and saving rates:', error);
-    }
-}
-async function getRate(id) {
-    try {
-        const reply = await client.get(id);
-        return JSON.parse(reply);
-    }
-    catch (err) {
-        throw new Error(`Failed to get rate for ${id}: ${err.message}`);
-    }
-}
-// Run fetchAndSaveRates every minute
-setInterval(fetchAndSaveRates, 6000);
-fetchAndSaveRates();
 const getConversionRate = async (params) => {
-    let amount_to;
-    const { from, to, amount = null } = params;
-    const rate_from = await getRate(from);
-    const rate_to = await getRate(to);
-    const from_to_usd = rate_from.rate;
-    const usd_to_coin = rate_to.rate;
-    const rate = 1 / (usd_to_coin * from_to_usd);
-    if (amount) {
-        amount_to = amount * rate;
+    try {
+        let amount_to;
+        const { from, to, amount = null } = params;
+        const ratesClass = new rates_1.default();
+        const rate_from = await ratesClass.getRate(from);
+        const rate_to = await ratesClass.getRate(to);
+        const from_to_usd = rate_from.rate;
+        const usd_to_coin = rate_to.rate;
+        const rate = 1 / (usd_to_coin * from_to_usd);
+        if (amount) {
+            amount_to = amount * rate;
+        }
+        return {
+            price_from: from_to_usd,
+            amount_from: amount,
+            rate: rate,
+            price_to: usd_to_coin,
+            amount_to: amount_to,
+            rate_from_id: rate_from.id,
+            rate_to_id: rate_to.id
+        };
     }
-    return {
-        price_from: from_to_usd,
-        amount_from: amount,
-        rate: rate,
-        price_to: usd_to_coin,
-        amount_to: amount_to,
-        rate_from_id: rate_from.id,
-        rate_to_id: rate_to.id
-    };
+    catch {
+        return { rate: null };
+    }
 };
 exports.getConversionRate = getConversionRate;
 exports.ratesRouter.get('/rate/:from/:to', async (req, res) => {
@@ -84,6 +44,13 @@ exports.ratesRouter.get('/rate/:from/:to', async (req, res) => {
             return res.status(http_status_codes_1.StatusCodes.BAD_REQUEST).json({ error: "Invalid parameters" });
         }
         const { rate, amount_from, amount_to, rate_from_id, rate_to_id } = await (0, exports.getConversionRate)({ from: from, to: to, amount: amount });
+        if (!rate) {
+            return res.status(http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR).json({
+                status: false,
+                message: "An error occured while fetching rates",
+                data: null
+            });
+        }
         // const from_to_usd = FIAT_USD[from];
         // const usd_to_coin = CRYPTO_USD[to];
         // if (!from_to_usd || !usd_to_coin) {
