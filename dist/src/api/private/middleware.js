@@ -27,7 +27,8 @@ function authenticate(req, res, next) {
         // Verify the token using the secret key
         jsonwebtoken_1.default.verify(token, process_1.env.SECURE_GEN_KEY, async (err, user) => {
             if (!err) {
-                if (await (0, api_token_db_1.isValidApiToken)(user, token, generate_secure_token_1.TokenType.PRIVATE_API)) {
+                const validToken = await (0, api_token_db_1.isValidApiToken)(user, token, generate_secure_token_1.TokenType.PRIVATE_API);
+                if (validToken) {
                     req.user = user;
                     return next(); // Proceed to the next middleware
                 }

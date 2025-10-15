@@ -6,6 +6,9 @@ import { userRouter } from './users/router';
 import { resubscribe } from './services/solana/solana';
 import Rates from './services/rates/rates';
 import { StatusCodes } from 'http-status-codes';
+// import listEndpoints from 'express-list-endpoints';
+// import { listTree } from './others/others';
+// import path from 'path';
 
 
 const app = express();
@@ -62,6 +65,16 @@ app.post('*', function(req, res){
       data: {}
    });
 })
+
+// listEndpoints(app).forEach((endpoint)=>{
+//   console.log(endpoint.path);
+// })
+
+// // Replace '.' with your target directory
+// const targetDir = process.argv[2] || './src';
+// console.log(path.basename(targetDir));
+// listTree(targetDir);
+
 
 
 export default app;

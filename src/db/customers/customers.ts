@@ -151,9 +151,10 @@ export default class Customers {
         const transactionObjStr = TRANSACTION_COLS.map((col) => `'${col}', t.${col}`).join(',')
 
         const transactionsQuery = `, (SELECT COALESCE(JSON_AGG(JSON_BUILD_OBJECT(${transactionObjStr})), '[]') AS transactions FROM ordered_transactions t WHERE c.id=t.customer_id)`;
-
-
+ 
         const conditionVar = isValidUUID(id) ? "c.id" : "c.email";
+
+        const conditionVar2 = isValidUUID(id) ? "t.customer_id" : "t.customer_email";
 
 
         const customer = await this.table
@@ -161,7 +162,7 @@ export default class Customers {
                 WITH ordered_transactions AS (
                     SELECT t.*
                     FROM transactions t
-                    WHERE t.customer_id = $2
+                    WHERE ${conditionVar2} = $2
                     ORDER BY t.created_at DESC
                 ), customer_aggregates AS (
                     SELECT 

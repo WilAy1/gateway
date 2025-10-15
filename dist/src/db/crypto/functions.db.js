@@ -47,6 +47,7 @@ async function fetchCoins(params) {
             }
             data[chainName].coins.push({
                 id: row.coin_id,
+                coin_id: row.coin_id,
                 coin: row.coin,
                 contract_address: row.contract_address,
             });

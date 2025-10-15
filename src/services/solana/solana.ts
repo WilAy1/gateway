@@ -1,4 +1,4 @@
-import web3 from "@solana/web3.js";
+import web3, { PublicKey } from "@solana/web3.js";
 import { Wallet, WalletData } from "../../interfaces/wallet";
 import { ChainTypes } from "../../enums/chain";
 import { SolanaTransactions } from "../../db/transactions/transactions.db";
@@ -6,6 +6,15 @@ import Table from "../../db/query";
 import { GWObject, isEmpty } from "../../utils/utils";
 
 export default class Solana {
+    isValidSolanaAddess(address) {
+        try {
+            const publicKey = new PublicKey(address);
+            return PublicKey.isOnCurve(publicKey.toBuffer());
+        }
+        catch (_) {
+            return false;
+        }
+    }
     async generate({ isToken }: { isToken: boolean; }){
         try {
             const keyPair = web3.Keypair.generate();

@@ -12,18 +12,15 @@ var CREDIT_REASONS;
 })(CREDIT_REASONS || (exports.CREDIT_REASONS = CREDIT_REASONS = {}));
 /**
  * WALLET TABLE | COLS
- * wallet_id uuid
  * user_id uuid
+ * coin_id uuid
  * balance float
- * created time
- * last_used time
- * others json
  *
  * * * * * * * * * * * * * * * *
  *
  * WALLET_ACTIVITY TABLE | COLS
  * activity_id uuid
- * wallet_id uuid
+ * coin_id uuid
  * user_id uuid
  * amount float
  * activity_type ENUM(credit, debit)
@@ -34,13 +31,38 @@ var CREDIT_REASONS;
  */
 class WalletDBQueries {
     constructor(params) {
-        this.wallet_query = new query_1.default("wallet");
-        this.activity_query = new query_1.default("wallet_activity");
+        this.wallet_table = new query_1.default("wallet");
+        this.activity_table = new query_1.default("wallet_activity");
         this.userId = params.userId;
     }
-    async getWallet() {
+    async getUserAsset(coin_id) {
         try {
-            const wallet = await this.wallet_query.select({
+            const asset = await this.wallet_table.select({
+                conditions: {
+                    compulsory: [
+                        {
+                            key: "user_id",
+                            value: this.userId
+                        },
+                        {
+                            key: "coin_id",
+                            value: coin_id
+                        }
+                    ]
+                }
+            });
+            if ((0, utils_1.isEmpty)(asset)) {
+                return false;
+            }
+            return asset[0];
+        }
+        catch (error) {
+            throw new Error("Error fetching user's asset");
+        }
+    }
+    async getUserAssets() {
+        try {
+            const assets = await this.wallet_table.select({
                 conditions: {
                     compulsory: [
                         {
@@ -50,35 +72,90 @@ class WalletDBQueries {
                     ]
                 }
             });
-            if ((0, utils_1.isEmpty)(wallet)) {
-                return false;
+            if ((0, utils_1.isEmpty)(assets)) {
+                return [];
             }
-            return wallet[0];
+            return assets;
         }
         catch (error) {
-            throw new Error("Error occured while fetching user's walllet.");
+            throw new Error("Error fetching user's assets");
         }
     }
-    async updateWallet(keys, values) {
+    async updateUserAsset(coinId, amount) {
         try {
-            const wallet = await this.getWallet();
-            if (wallet) {
-                await this.wallet_query.update(keys, values, {
-                    compulsory: [{
+            const asset = await this.getUserAsset(coinId);
+            if (asset) {
+                await this.wallet_table.update(["balance"], [amount], {
+                    compulsory: [
+                        {
                             key: "user_id",
                             value: this.userId
-                        }]
+                        },
+                        {
+                            key: "coin_id",
+                            value: coinId
+                        }
+                    ]
                 });
             }
+            else {
+                await this.wallet_table.insert(["user_id", "coin_id", "balance"], [this.userId, coinId, amount]);
+            }
+            return true;
         }
         catch (error) {
             console.error(error);
-            throw new Error("Error occured while updating wallet");
+            throw new Error("Error updating user's asset");
         }
     }
+    /*protected async getWallet() : Promise<boolean | GWObject> {
+        try {
+            const wallet = await this.wallet_table.select({
+                conditions: {
+                    compulsory: [
+                        {
+                            key: "user_id",
+                            value: this.userId
+                        }
+                    ]
+                }
+            });
+
+            if(isEmpty(wallet)) {
+                return false;
+            }
+
+            return wallet[0] as GWObject;
+        }
+        catch(error) {
+            throw new Error("Error occured while fetching user's walllet.");
+        }
+    }
+
+    protected async updateWallet(keys: Array<string>, values: Array<unknown>) {
+        try {
+            const wallet = await this.getWallet();
+            if(wallet) {
+                await this.wallet_table.update(
+                    keys,
+                    values,
+                    {
+                        compulsory: [{
+                            key: "user_id",
+                            value: this.userId
+                        }]
+                    }
+                )
+            }
+        }
+        catch(error) {
+            console.error(error);
+            throw new Error("Error occured while updating wallet");
+        }
+    }*/
     async getWalletActivity(activity_id) {
         try {
-            const activity = await this.activity_query.select({
+            const activity = await this.activity_table.select({
                 conditions: {
                     compulsory: [
                         {
@@ -103,12 +180,8 @@ class WalletDBQueries {
     }
     async createWalletActivity(params) {
         try {
-            const wallet = this.getWallet();
-            if (wallet) {
-                await this.activity_query.insert(Object.keys(params), Object.values(params));
-                return true;
-            }
-            return false;
+            await this.activity_table.insert(Object.keys(params), Object.values(params));
+            return true;
         }
         catch (error) {
             console.error(error);
@@ -129,21 +202,18 @@ class WalletDB extends WalletDBQueries {
     constructor(params) {
         super(params);
     }
-    async credit(amount, reason, reference_id) {
-        const wallet = await this.getWallet();
-        if (!wallet) {
-            return;
+    async credit(coinId, amount, reason, reference_id) {
+        const asset = await this.getUserAsset(coinId);
+        let newAmount = amount;
+        if (asset) {
+            const currentAmount = parseFloat(asset["balance"]);
+            newAmount += currentAmount;
         }
-        const currentAmount = parseFloat(wallet["balance"]);
-        if (isNaN(currentAmount))
-            return;
-        const newAmount = currentAmount + amount;
-        console.log(currentAmount, amount, newAmount);
         const date = new Date();
         const currentIsoTIme = date.toISOString();
         const activity = {
             user_id: this.userId,
-            wallet_id: wallet["wallet_id"],
+            coin_id: coinId,
             amount: amount,
             activity_type: ACTIVITY_TYPE.credit,
             reference_id: reference_id,
@@ -151,14 +221,9 @@ class WalletDB extends WalletDBQueries {
             reason: CREDIT_REASONS.transaction_completed,
             created: currentIsoTIme
         };
-        this.updateWallet([
-            "balance",
-            "last_used"
-        ], [
-            newAmount,
-            currentIsoTIme
-        ]);
+        this.updateUserAsset(coinId, newAmount);
         this.createWalletActivity(activity);
+        return true;
     }
     debit() {
     }

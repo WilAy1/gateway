@@ -10,6 +10,7 @@ import { getConversionRate } from "../../public/rates/router";
 import { QueryResult } from "pg";
 import Solana from "../../../services/solana/solana";
 import Customers from "../../../db/customers/customers";
+import Ethereum from "../../../services/ethereum/ethereum";
 
 const PLATFORM_PAYMENT_URL = "http://localhost:3001/pay";
 
@@ -92,9 +93,13 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
         if(transaction["onchain_status"] == null && transaction["deposit_address"] == null) {
 
             const solana = new Solana();
+            const etherum = new Ethereum();
             switch(chain) {
                 case ChainTypes.SOLANA:
                     depositAddress = await solana.generate({ isToken: coin != "sol" });
+                    break;
+                case ChainTypes.ETHEREUM:
+                    depositAddress = await etherum.generate();
                     break;
                 default:
                     break;                    
@@ -176,6 +181,18 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
                 }
             })
 
+            const merchantTable = new Table("users");
+            const merchant = await merchantTable.select({
+                conditions: {
+                    compulsory: [
+                        {
+                            key: "user_id",
+                            value: issuer["userId"]
+                        }
+                    ]
+                }
+            });
+
 
             const updatedResult = removeKeys(newTransactionResult[0] as GWObject, 
                 [
@@ -197,7 +214,7 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
             return {
                 status : true,
                 message : "Successfully generated address",
-                result: updatedResult
+                result: {...updatedResult, merchant: { name: merchant[0]["business_name"] }}
             }
 
 
@@ -213,6 +230,7 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
 export async function fetchTransaction(issuer: Map<string, unknown>, params) {
     try {
         const query = new Table("transactions");
+        const merchantTable = new Table("users");
 
         const { reference } = params;
 
@@ -231,9 +249,20 @@ export async function fetchTransaction(issuer: Map<string, unknown>, params) {
             }
         });
 
+        const merchant = await merchantTable.select({
+            conditions: {
+                compulsory: [
+                    {
+                        key: "user_id",
+                        value: issuer["userId"]
+                    }
+                ]
+            }
+        });
 
 
-        if(!isEmpty(transaction)) {
+
+        if(!isEmpty(transaction) && !isEmpty(merchant)) {
 
             const updatedResult = removeKeys(transaction[0] as GWObject, 
                 [
@@ -250,12 +279,13 @@ export async function fetchTransaction(issuer: Map<string, unknown>, params) {
                 "ipaddress" 
                 ]);
 
+            
             //startSolanaListening(updatedResult['deposit_address'] as string);
 
             return {
                 status : true,
                 message : "Successfully fetched transaction",
-                result: updatedResult
+                result: {...updatedResult, merchant: { name: merchant[0]["business_name"] }}
             }
         }
 

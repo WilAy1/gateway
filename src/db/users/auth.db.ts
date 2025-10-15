@@ -7,14 +7,14 @@ import pool from "../connect";
 import { generateToken, TokenType } from "../../utils/generate_secure_token";
 
 
-export async function authRegister(email: string, password: string) : Promise<UserRegisterResponse> {
+export async function authRegister(businessName: string, email: string, password: string) : Promise<UserRegisterResponse> {
     let client: PoolClient
     try {
         email = email.trim();
 
-        if(!isValidEmail(email) && !isValidPassword(password)){
+        if(!isValidEmail(email) && !isValidPassword(password) && businessName.length < 2){
             return {
-                message: "Invalid email/password format",
+                message: "Invalid business name, email or password format",
                 success: false
             }
         }
@@ -68,6 +68,7 @@ export async function authRegister(email: string, password: string) : Promise<Us
 
         query.insert(
             [
+                "business_name",
                 "email",
                 "password",
                 "hash",
@@ -81,6 +82,7 @@ export async function authRegister(email: string, password: string) : Promise<Us
 
             ],
             [
+                businessName,
                 email,
                 hashedPassword,
                 randomHash,

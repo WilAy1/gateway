@@ -107,7 +107,7 @@ export async function fetchCoin(coinId?:string, params?: CoinWithName) : Promise
             value: "active"
         }]
         if(params && !coinId){
-            const chainDetails = await fetchChain(params.chainName)
+            const chainDetails = await fetchChain({chainName: params.chainName})
             if(chainDetails){
                 compulsoryConditions.push(
                     {
@@ -154,17 +154,29 @@ export async function fetchCoin(coinId?:string, params?: CoinWithName) : Promise
 }
 
 
-export async function fetchChain(chainName: string) {
+export async function fetchChain({ chainId = null, chainName = null }) {
+    const compulsoryConditions = [];
+    if(chainId) {
+    compulsoryConditions.push(
+            {
+                key: "chain_id",
+                value: chainId
+            }
+        );
+    } else if (chainName) {
+        compulsoryConditions.push(
+            {
+                key: "chain",
+                value: chainName
+            }
+        );
+    } else return null;
+
     const table = new Table("available_chains");
     const result = await table.select({
         cols: ["chain_id", "chain"],
         conditions: {
-            compulsory: [
-                {
-                    key: "chain",
-                    value: chainName
-                }
-            ]
+            compulsory: compulsoryConditions
         }
     })
     

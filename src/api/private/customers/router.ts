@@ -11,14 +11,14 @@ customersRouter.post('/create', async (req, res) => {
         const { email } = req.body;
         const issuer = req['user'];
         if(!email){
-            return res.status(StatusCodes.BAD_GATEWAY).json({  });
+            return res.status(StatusCodes.BAD_REQUEST).json({  });
         }
 
         const customers = new Customers(issuer.userId);
 
         const response = await customers.create(req.body);
         if(!response){
-            return res.status(StatusCodes.BAD_GATEWAY).json({ });
+            return res.status(StatusCodes.BAD_REQUEST).json({ });
         }
 
         return res.status(StatusCodes.OK).json({
@@ -74,6 +74,7 @@ customersRouter.patch('/update/:id', async (req, res) => {
         data: response
     });
 })
+
 
 export async function fnAllCustomers (req, res) {
     const issuer = req['user'];

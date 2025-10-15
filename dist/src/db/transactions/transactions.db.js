@@ -10,6 +10,8 @@ const utils_1 = require("../../utils/utils");
 const TransactionStatus_1 = require("../../interfaces/TransactionStatus");
 const chain_1 = require("../../enums/chain");
 const solana_1 = __importDefault(require("../../services/solana/solana"));
+const functions_db_1 = require("../crypto/functions.db");
+const webhook_1 = require("../../webhook/webhook");
 class TransactionsDBQueries {
     constructor(issuer) {
         this.transactions = new query_1.default("transactions");
@@ -155,13 +157,23 @@ class TransactionDB extends TransactionsDBQueries {
                     onchain_transaction_hash: transactionHash,
                     deposit_received_at: depositReceived
                 };
+                const coinDetails = await (0, functions_db_1.fetchCoin)(null, {
+                    coinName: transaction["coin"],
+                    chainName: transaction["chain"]
+                });
+                if (!coinDetails) {
+                    console.error("Coin details not found for transaction: ", transactionId);
+                    return false;
+                }
                 const update = await this.updateTransaction(transactionId, Object.keys(updateObject), Object.values(updateObject));
                 //await subscribe();
-                if (update) {
-                    const wallet = new wallet_db_1.WalletDB({ userId: this.issuer });
-                    await wallet.credit(amount_to_credit, wallet_db_1.CREDIT_REASONS.transaction_completed, transactionId);
-                    return true;
-                }
+                if (!update)
+                    return false;
+                const wallet = new wallet_db_1.WalletDB({ userId: this.issuer });
+                const creditStatus = await wallet.credit(coinDetails.coin_id, amount_to_credit, wallet_db_1.CREDIT_REASONS.transaction_completed, transactionId);
+                const webhook = new webhook_1.Webhook(this.issuer);
+                webhook.sendTransaction(transactionId, webhook_1.WebhookEvent.TRANSACTION_COMPLETED);
+                return creditStatus ?? false;
             }
             return false;
         }

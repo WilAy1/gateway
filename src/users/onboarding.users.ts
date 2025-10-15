@@ -8,8 +8,8 @@ export const onboardingRouter = express.Router();
 
 onboardingRouter.post('/register', async (req, res) => {
     try {
-        const { email, password } = req.body;
-        const result = await authRegister(email, password);
+        const { email, password, businessName } = req.body;
+        const result = await authRegister(businessName, email, password);
         if (!result.success) {
             if (result.emailExists) {
                 return res.status(StatusCodes.CONFLICT).json({ error: result.message });
