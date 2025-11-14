@@ -1,9 +1,8 @@
 import axios from 'axios';
 import crypto from 'crypto';
+import {TransactionDB}  from '../db/transactions/transactions.db';
 import { GWObject, isEmpty, removeKeys } from '../utils/utils';
 import Table from '../db/query';
-import { TransactionDB } from '../db/transactions/transactions.db';
-
 
 interface WebhookData {
     event: WebhookEvent,
@@ -107,9 +106,10 @@ class Webhook {
     }
 
     async sendTransaction(transactionId: string, event: WebhookEvent){
-        const transactionDb = new TransactionDB(this.userId);
+
+        const transactionDb =  new TransactionDB(this.userId);
         const transaction = await transactionDb.fetchTransaction(transactionId);
-        const updatedTransaction = removeKeys(transaction[0] as GWObject, 
+        const updatedTransaction = removeKeys(transaction as GWObject, 
             [
             'issuer_id',
             'description',

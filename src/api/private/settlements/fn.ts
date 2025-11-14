@@ -26,7 +26,7 @@ export async function fnFetchSettlements(req, res) {
 
     const settlement = new Settlements(issuer.userId);
 
-    const response = settlement.get();
+    const response = await settlement.get();
     
 
     return res.status(StatusCodes.OK).json({

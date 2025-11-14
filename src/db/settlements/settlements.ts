@@ -24,6 +24,7 @@ export default class Settlements {
                 return false;
             }
 
+
             const chainDetails = await fetchChain({chainId: chainId});
             if(!chainDetails) return false;
 
@@ -41,8 +42,10 @@ export default class Settlements {
                     return false;
             }
 
+
             const newSettlement = await this.settlementTable.insert(["user_id", "chain_id", "address"], [this.userId, chainId, address], { returnColumn: "id" });
             if(!newSettlement) return;
+
 
             return await this.get({byChainId: newSettlement["id"]});
         } catch(e){
@@ -52,7 +55,7 @@ export default class Settlements {
         
         
     }
-    async get({byChainId: chainId = null} = null) : Promise<GWObject[]> {
+    async get({byChainId: chainId = null} = {}) : Promise<GWObject[]> {
         const conditions: ConditionChild[] = [
             {
                 key: "user_id",
@@ -71,7 +74,7 @@ export default class Settlements {
                 compulsory: conditions
             }
         });
-        
+
         return settlements as GWObject[];
     }
     async update({chainId, address = null, isActive = null}) {

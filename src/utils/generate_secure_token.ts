@@ -17,6 +17,11 @@ function generatePublicApiToken(data: unknown, expiresIn?: number) : string {
     return token;
 }
 
+function generateHandshakeToken(data: unknown) : string {
+    const token = jwt.sign(data, env.SECURE_TRANSACTION_HANDSHAKE_GEN_KEY);
+    return token;
+}
+
 export function generateToken(tokenType: TokenType, data: unknown, expiresIn?: number)  {
     switch(tokenType){
         case TokenType.LOGIN:
@@ -25,7 +30,9 @@ export function generateToken(tokenType: TokenType, data: unknown, expiresIn?: n
             return generateApiToken(data, expiresIn)
         case TokenType.PUBLIC_API:
             return generatePublicApiToken(data, expiresIn);
-    
+        case TokenType.TRANSACTION_HANDSHAKE:
+            return generateHandshakeToken(data);
+
         default:
             return null;
         
@@ -35,7 +42,8 @@ export function generateToken(tokenType: TokenType, data: unknown, expiresIn?: n
 export enum TokenType {
     LOGIN,
     PRIVATE_API,
-    PUBLIC_API
+    PUBLIC_API,
+    TRANSACTION_HANDSHAKE
 }
 
 

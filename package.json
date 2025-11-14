@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "@solana/spl-account-compression": "^0.2.0",
+    "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.90.1",
     "@types/pg": "^8.11.2",
     "@types/pg-pool": "^2.0.6",

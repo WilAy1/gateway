@@ -3,7 +3,7 @@ import cors from 'cors';
 import { privateRouter } from './api/private/router';
 import { publicRouter } from './api/public/router';
 import { userRouter } from './users/router';
-import { resubscribe } from './services/solana/solana';
+import { monitorPending, resubscribe } from './services/solana/solana';
 import Rates from './services/rates/rates';
 import { StatusCodes } from 'http-status-codes';
 // import listEndpoints from 'express-list-endpoints';
@@ -16,11 +16,11 @@ const port = 3000;
 
 
 
+monitorPending();
 resubscribe();
 
 
 // Run fetchAndSaveRates every minute
-
 
 const rates = new Rates();
 setInterval(rates.fetchRates.bind(rates) , 60000);
@@ -29,6 +29,8 @@ rates.fetchRates();
 
 app.use(cors())
 app.use(express.json());
+
+
 
 app.use('/api/p', privateRouter);
 app.use('/api/', publicRouter);
@@ -74,6 +76,28 @@ app.post('*', function(req, res){
 // const targetDir = process.argv[2] || './src';
 // console.log(path.basename(targetDir));
 // listTree(targetDir);
+
+
+// const webhook = new Webhook("54c91f1c-9ae9-45aa-9825-c16800f7881f");
+// webhook.sendTransaction("62eb013a-5f30-4493-9e92-07b5c07a3abd", WebhookEvent.TRANSACTION_COMPLETED);
+
+
+// app.post('/webhook', express.raw({type: "*/*" }), (req, res) => {
+//   const logEntry = {
+//     timestamp: new Date().toISOString(),
+//     method: req.method,
+//     url: req.originalUrl,
+//     ip: req.ip,
+//     headers: req.headers,
+//     rawBody: req.body, // important!
+//     parsedBody: req.body,
+//   };
+
+//   console.log("📩 Incoming webhook:", JSON.stringify(logEntry, null, 2));
+
+//   // Respond quickly — providers expect fast ACK
+//   res.status(200).send("ok");
+// });
 
 
 

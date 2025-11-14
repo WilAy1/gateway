@@ -118,6 +118,9 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
             }
 
             const contract_address = coinDetails['contract_address'];
+            const coinDecimals = coinDetails['decimals'];
+
+            const amount_to_pay = parseFloat(amount_to.toFixed(coinDecimals));
 
 
 

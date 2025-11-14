@@ -3,6 +3,7 @@ export interface UnitCoin {
     coin_id?: string,
     coin: string,
     contract_address: string,
+    chain_id?: string,
     chain? : string
 }
 

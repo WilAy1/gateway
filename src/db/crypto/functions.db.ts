@@ -57,6 +57,7 @@ export async function fetchCoins( params?: CoinDetails) : Promise<Chain> {
                 coin_id: row.coin_id,
                 coin: row.coin,
                 contract_address: row.contract_address,
+                chain_id: row.chain_id
             });
         });
 

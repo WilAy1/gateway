@@ -1,12 +1,56 @@
-import web3, { PublicKey } from "@solana/web3.js";
-import { Wallet, WalletData } from "../../interfaces/wallet";
+import web3, { Keypair, LAMPORTS_PER_SOL, PublicKey, sendAndConfirmTransaction, SystemProgram, Transaction } from "@solana/web3.js";
+import { TransactionWalletData, Wallet, WalletData } from "../../interfaces/wallet";
 import { ChainTypes } from "../../enums/chain";
-import { SolanaTransactions } from "../../db/transactions/transactions.db";
 import Table from "../../db/query";
 import { GWObject, isEmpty } from "../../utils/utils";
+import base58 from "bs58";
+import { SolanaTransactions } from "../../db/transactions/solana.transactions.db";
+import { getAccount, getAssociatedTokenAddress, getMint } from "@solana/spl-token";
+import { TransactionDB } from "../../db/transactions/transactions.db";
+import { TransactionStatus } from "../../interfaces/TransactionStatus";
 
-export default class Solana {
-    isValidSolanaAddess(address) {
+class Solana {
+    protected connection: web3.Connection;
+    
+    constructor(){
+        this.connection = new web3.Connection("https://devnet.helius-rpc.com/?api-key=1cda3a5d-09d7-4cc3-b8c8-ac12f40d2270", {
+            wsEndpoint: "wss://devnet.helius-rpc.com/?api-key=1cda3a5d-09d7-4cc3-b8c8-ac12f40d2270",
+          });
+    }
+
+    async sendSol(address: string){
+        try {
+            if (!this.isValidSolanaAddess(address)) return console.error("Invalid address");
+
+            const privateKey = base58.decode(
+              "5aSQ5SoPxbYevAQw4wBydEm488KTM5idcHC2VZQAFYN4Htaj2JGcWCQoxhxpqRVf3qreSfSTQ1U8EyVZsRnEE6Xm"
+            );
+            const sender = Keypair.fromSecretKey(privateKey);
+            const recipient = new PublicKey(address);
+
+            // Send small fee (e.g. 0.01 SOL)
+            const lamports = 0.005 * LAMPORTS_PER_SOL;
+
+            const tx = new Transaction().add(
+              SystemProgram.transfer({
+                fromPubkey: sender.publicKey,
+                toPubkey: recipient,
+                lamports,
+              })
+            );
+
+            const signature = await sendAndConfirmTransaction(this.connection, tx, [sender], {commitment: "finalized"});
+
+            console.log(`Credited ${address} with 0.01 SOL. Tx: ${signature}`);
+
+            return true;
+        }
+        catch(error) {
+            return false;
+        }
+    }
+
+    isValidSolanaAddess(address: string) {
         try {
             const publicKey = new PublicKey(address);
             return PublicKey.isOnCurve(publicKey.toBuffer());
@@ -45,7 +89,7 @@ export default class Solana {
 
     async saveWalletData(wallet: WalletData) {
         const key = Uint8Array.from(wallet.key);
-        const keyHex = Buffer.from(key).toString('hex');
+        const keyBuffer = Buffer.from(key);
         const { address, accountId } = wallet;
 
 
@@ -59,14 +103,31 @@ export default class Solana {
             [
                 address,
                 accountId,
-                keyHex
+                keyBuffer
             ]
         );
     }
 
+    async getWalletData(address: string) : Promise<TransactionWalletData> {
+        const table = new Table("solana_wallets");
+        const walletData = await table.select({
+            cols: ["account_key", "address"],
+            conditions: {
+                compulsory: [
+                    {
+                        key: "address",
+                        value: address
+                     }
+                ]
+            }
+        });
+        if(isEmpty(walletData)) return null;
+        return walletData[0] as TransactionWalletData;
+    }
+
     async getParsedTransaction({ signature }: { signature: string; }){
         try {
-            const solana = new web3.Connection("https://devnet.helius-rpc.com/?api-key=1cda3a5d-09d7-4cc3-b8c8-ac12f40d2270");
+            const solana = this.connection;
             const transaction = await solana.getParsedTransaction(
               signature,
               { maxSupportedTransactionVersion: 0 }
@@ -87,10 +148,7 @@ export default class Solana {
         const publicKey = new web3.PublicKey(
             address
           );
-          const solanaConnection = new web3.Connection("https://devnet.helius-rpc.com/?api-key=1cda3a5d-09d7-4cc3-b8c8-ac12f40d2270", {
-            wsEndpoint: "wss://devnet.helius-rpc.com/?api-key=1cda3a5d-09d7-4cc3-b8c8-ac12f40d2270",
-          });
-          const logId = solanaConnection.onLogs(
+          const logId = this.connection.onLogs(
             publicKey,
             async (logs)=>{
                 await this.parse(logs);
@@ -103,10 +161,7 @@ export default class Solana {
     }
 
     unsubscribe(logId){
-        const solanaConnection = new web3.Connection("https://devnet.helius-rpc.com/?api-key=1cda3a5d-09d7-4cc3-b8c8-ac12f40d2270", {
-            wsEndpoint: "wss://devnet.helius-rpc.com/?api-key=1cda3a5d-09d7-4cc3-b8c8-ac12f40d2270",
-          });
-        solanaConnection.removeOnLogsListener(logId);
+        this.connection.removeOnLogsListener(logId);
     }
 
     async parse(logs, isToken = false){
@@ -134,10 +189,7 @@ export default class Solana {
             const publicKey = new web3.PublicKey(
                 tokenAddress
               );
-              const solanaConnection = new web3.Connection("https://devnet.helius-rpc.com/?api-key=1cda3a5d-09d7-4cc3-b8c8-ac12f40d2270", {
-                wsEndpoint: "wss://devnet.helius-rpc.com/?api-key=1cda3a5d-09d7-4cc3-b8c8-ac12f40d2270",
-              });
-              solanaConnection.onLogs(
+              this.connection.onLogs(
                 publicKey,
                 async (logs)=>{
                     const tokenTransferLogs = logs.logs.filter(log => 
@@ -155,10 +207,80 @@ export default class Solana {
               );
         }
     }
+    async getWalletSolBalance(address) {
+        const walletAddress = new PublicKey(address);
 
-    
+        const solBalanceLamports = await this.connection.getBalance(walletAddress);
+        const solBalance = solBalanceLamports / 1e9;
+        return solBalance;
+    }
+    async getWalletTokenBalance(address, token) {
+        try {
+            const tokenMint = new PublicKey(token);
+            const walletAddress = new PublicKey(address);
+            const ata = await getAssociatedTokenAddress(tokenMint, walletAddress);
+            const tokenAccountInfo = await getAccount(this.connection, ata);
+            const mintInfo = await getMint(this.connection, tokenMint);
+            const decimals = mintInfo.decimals;
+
+            const tokenBalance = Number(tokenAccountInfo.amount);
+            const uiAmount = tokenBalance / Math.pow(10, decimals);
+            return uiAmount;
+        }
+        catch {
+            //
+        }
+    }
+    async getLastHash(address){
+        const walletAddress = new PublicKey(address);
+        const signatures = await this.connection.getSignaturesForAddress(walletAddress, {
+            limit: 1
+        });
+
+        if (signatures.length === 0) {
+            return;
+        }
+
+
+        const lastTx = signatures[0];
+        return lastTx;
+}
 }
 
+export async function monitorPending(){
+    const solanaTransactions = new SolanaTransactions();
+    const unfinishedTransactions = await solanaTransactions.fetchUnfinished();
+    const solana = new Solana();
+    unfinishedTransactions.forEach(async transaction => {
+            const id = transaction['id'] as string;
+            const issuer = transaction['issuer_id'] as string;
+            const amount_to_pay = transaction['amount_to_pay'] as number;
+
+            let addressBalance = 0;
+
+            if(transaction.coin == "sol"){
+                addressBalance = await solana.getWalletSolBalance(transaction.deposit_address);
+            }
+            else {
+                addressBalance = await solana.getWalletTokenBalance(transaction.deposit_address, transaction.coin_contract_address);
+            }
+
+            if(addressBalance >= amount_to_pay) {
+                const transactionDB = new TransactionDB(issuer);
+                const lastTx = await solana.getLastHash(transaction.deposit_address);
+                const date = new Date();
+                date.setTime(lastTx.blockTime * 1000);
+                transactionDB.confirmTransaction(
+                    {
+                        transactionId: String(id),
+                        transactionHash: lastTx.signature || "",
+                        status: TransactionStatus.COMPLETED,
+                        depositReceived: date.toISOString()
+                    }
+                );
+            }
+    })
+}
 
 export async function resubscribe(){
     const solanaTransactions = new SolanaTransactions();
@@ -235,3 +357,6 @@ const getWalletAddressFromTokenAccount = async (tokenAccount) => {
     }
     return null;
 };
+
+
+export default Solana;

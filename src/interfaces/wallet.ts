@@ -8,6 +8,11 @@ export interface WalletData extends Wallet {
     accountId: number
 }
 
+export interface TransactionWalletData {
+    account_key,
+    address: string
+}
+
 
 export interface EthereumWalletData extends Wallet {
     key: string

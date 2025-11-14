@@ -10,6 +10,10 @@ enum CREDIT_REASONS {
     transaction_completed = "transaction_completed"
 }
 
+enum DEBIT_REASONS {
+    settlement_completed = "settlement_completed"
+}
+
 /**
  * WALLET TABLE | COLS
  * user_id uuid
@@ -275,12 +279,33 @@ class WalletDB extends WalletDBQueries {
         return true;
 
     }
-    debit() {
+    async debit(coinId: string, amount: number, reason: DEBIT_REASONS, reference_id: string) {
+        const asset = await this.getUserAsset(coinId as UUID);
+        let newAmount = amount;
+        if(asset){
+            const currentAmount = parseFloat(asset["balance"]);
+            newAmount -= currentAmount;
+        }
+        const date = new Date();
+        const currentIsoTIme = date.toISOString();
 
+        const activity : WalletActivity = {
+            user_id: this.userId as UUID, 
+            coin_id: coinId,
+            amount: amount,
+            activity_type: ACTIVITY_TYPE.debit,
+            reference_id: reference_id,
+            reference_origin: ReferenceOrigin.transaction,
+            reason: DEBIT_REASONS.settlement_completed,
+            created: currentIsoTIme
+        }
+        this.updateUserAsset(coinId as UUID, newAmount);
+        this.createWalletActivity(activity);
+        return true;
     }
     log() {
 
     }
 }
 
-export { WalletDB, CREDIT_REASONS };
+export { WalletDB, CREDIT_REASONS, DEBIT_REASONS };

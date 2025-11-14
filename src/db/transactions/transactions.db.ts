@@ -3,10 +3,10 @@ import Table from "../query";
 import { GWObject, isEmpty, isValidUUID } from "../../utils/utils";
 import { TransactionStatus } from '../../interfaces/TransactionStatus';
 import { ChainTypes } from "../../enums/chain";
-import Solana from "../../services/solana/solana";
 import { Condition, DBSelectParams } from "../../interfaces/db.interface";
 import { fetchCoin } from "../crypto/functions.db";
-import { Webhook, WebhookEvent } from "../../webhook/webhook";
+import SolanaSettlements from "../../services/solana/settlement";
+import Settlements from "../settlements/settlements";
 
 
 class TransactionsDBQueries {
@@ -155,6 +155,8 @@ class TransactionDB extends TransactionsDBQueries {
     }
 
     async confirmTransaction(transactionParam: ConfirmTransactionParam) : Promise<boolean> {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { Webhook, WebhookEvent } = require("../../webhook/webhook");
         const { transactionId, transactionHash, status: transactionStatus, depositReceived } = transactionParam;
 
         try {
@@ -211,11 +213,28 @@ class TransactionDB extends TransactionsDBQueries {
 
                 if(!update) return false
 
+
+                // credit based on settlement fallback to credit if failed  
+
                 const wallet = new WalletDB({ userId: this.issuer });
                 const creditStatus = await wallet.credit(coinDetails.coin_id, amount_to_credit, CREDIT_REASONS.transaction_completed, transactionId);
                 
                 const webhook = new Webhook(this.issuer);
                 webhook.sendTransaction(transactionId, WebhookEvent.TRANSACTION_COMPLETED);
+
+                // start settlement
+
+                if(transaction.chain == ChainTypes.SOLANA){
+                    const settlement = new Settlements(this.issuer);
+                    const settlementAddress = await settlement.get({byChainId: coinDetails.chain_id});
+                    if(settlementAddress.length > 0){
+                        const solanaSettlement = new SolanaSettlements();
+                        solanaSettlement.settle({transaction: transaction, amount: amount_to_credit, fee: application_fee, tokenAddress: coinDetails.contract_address, settlementAddress: settlementAddress[0]["address"], coinDetails: coinDetails});
+                        //if(settled) wallet.debit(coinDetails.coin_id, amount_to_credit, DEBIT_REASONS.settlement_completed, transactionId);
+                    }
+                }
+                
+
 
                 return creditStatus ?? false;
                 
@@ -249,226 +268,8 @@ class TransactionDB extends TransactionsDBQueries {
 }
 
 
-class SolanaTransactions {
-
-    private transactions: Table;
-    private walletTable: Table;
-    
-    constructor() {
-        this.transactions = new Table("transactions");
-        this.walletTable = new Table("solana_wallets");
-    }
-
-    async fetchAll(){
-
-    }
-
-    async fetchWalletData(address: string){
-        try {
-            const wallet = await this.walletTable.select({
-                conditions: {
-                    compulsory: [
-                        {
-                            key: "address",
-                            value: address
-                        }
-                    ]
-                }
-            })
-        
-            if(wallet){
-                return wallet[0];
-            }
-            return;
-        }
-        catch(error){
-            console.error(error);
-            throw new Error("Error fetching wallet data");
-        }
-    }
-
-    async fetchUnfinished(){
-        try {
-            const transaction = await this.transactions.select({
-                conditions: {
-                    compulsory: [
-                        {
-                            key: "chain",
-                            value: ChainTypes.SOLANA
-                        },
-                        {
-                            key: "status",
-                            value: TransactionStatus.AWAITINGPAYMENT
-                        }
-                    ]
-                }
-            });
-            return transaction as Array<GWObject>;
-
-        }
-        catch(error){
-            console.error(error);
-            throw new Error("Error fetching transactions");
-        }   
-    }
-
-    async findTransactionWithAddress(address){
-        try {
-            const transaction = await this.transactions.select({
-                conditions: {
-                    compulsory: [
-                        {
-                            key: "chain",
-                            value: ChainTypes.SOLANA
-                        },
-                        {
-                            key: "deposit_address",
-                            value: address
-                        }
-                    ]
-                }
-            });
-
-            return transaction as Array<GWObject>;
-
-        }
-        catch(error){
-            console.error(error);
-            throw new Error("Error fetching transactions");
-        }   
-    }
-
-    async parse(payload){
-            const { meta, transaction, blockTime } = payload;
-            const { postBalances } = meta;
-            const { message, signatures } = transaction;
-            const { accountKeys } = message;
-
-            
-            const depositAddress = accountKeys[1]['pubkey'].toString();
-            const transactionHash = signatures[0];
-            const addressBalance = postBalances[1] / 1000000000;
-            
-            
-            const transactions = await this.findTransactionWithAddress(depositAddress);
-            if(isEmpty(transactions)){
-                return
-            }
-
-        
-            const id = transactions[0]['id'] as string;
-            const issuer = transactions[0]['issuer_id'] as string;
-            const amount_to_pay = transactions[0]['amount_to_pay'] as number;
-            const date = new Date();
-            date.setTime(blockTime * 1000);
-
-            if(addressBalance >= amount_to_pay) {
-                const transactionDB = new TransactionDB(issuer);
-                await transactionDB.confirmTransaction(
-                    {
-                        transactionId: String(id),
-                        transactionHash: transactionHash,
-                        status: TransactionStatus.COMPLETED,
-                        depositReceived: date.toISOString()
-                    }
-                );
-
-                const walletAddress = this.fetchWalletData(depositAddress);
-                if(walletAddress){
-                    const logId = walletAddress['account_id'];
-                    const solana = new Solana();
-                    solana.unsubscribe(logId);
-                }
-            }
-            else if(addressBalance < amount_to_pay){
-                //
-            }
-        
-        
-        }
-
-        async parseForToken(payload, depositAddress){
-            const parsedInstr =  payload.transaction.message.instructions.find((instr)=> instr.programId.toString() === "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
-            if(!parsedInstr) return;
-            const tokenId = parsedInstr.parsed.info.mint;
-            const { meta, transaction, blockTime } = payload;
-            const { postTokenBalances } = meta;
-            const {  signatures } = transaction;
-
-
-            const addressBalance = postTokenBalances.find((tokenBalances) => tokenBalances.owner == depositAddress).uiTokenAmount.uiAmount;
-            const transactionHash = signatures[0];
-
-            const transactions = await this.findTransactionWithAddress(depositAddress);
-            if(isEmpty(transactions)){
-                return
-            }
-            
-            const coin = transactions[0]['coin'] as string;
-            const { contract_address } = await this.getCoinDetails(coin);
-
-            if(contract_address != tokenId){
-                console.log("wrong token for transaction")
-                return;
-            }
-
-
-        
-            const id = transactions[0]['id'] as string;
-            const issuer = transactions[0]['issuer_id'] as string;
-            const amount_to_pay = transactions[0]['amount_to_pay'] as number;
-            const date = new Date();
-            date.setTime(blockTime * 1000);
-
-            if(addressBalance >= amount_to_pay) {
-                const transactionDB = new TransactionDB(issuer);
-                await transactionDB.confirmTransaction(
-                    {
-                        transactionId: String(id),
-                        transactionHash: transactionHash,
-                        status: TransactionStatus.COMPLETED,
-                        depositReceived: date.toISOString()
-                    }
-                );
-
-                // const walletAddress = this.fetchWalletData(depositAddress);
-                // if(walletAddress){
-                //     const logId = walletAddress['account_id'];
-                //     const solana = new Solana();
-                //     solana.unsubscribe(logId);
-                // }
-            }
-            
-        }
-
-        async getCoinDetails(coin){
-            const coinsTable = new Table("available_coins");
-            const result = await coinsTable.select({
-                cols: [
-                    "contract_address",
-                ],
-                conditions: {
-                    compulsory: [
-                        {
-                            key: "status",
-                            value: "active"
-                        },
-                        {
-                            key: "coin",
-                            value: coin
-                        }
-                    ]
-                }
-            }) as GWObject[];
-
-            if(isEmpty(result)){
-                return;
-            }
-
-            return result[0];
-        }
-}
 
 
 
-export { TransactionDB, SolanaTransactions, TransactionsDBQueries };
+
+export { TransactionDB, TransactionsDBQueries };
