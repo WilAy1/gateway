@@ -208,11 +208,16 @@ class Solana {
         }
     }
     async getWalletSolBalance(address) {
-        const walletAddress = new PublicKey(address);
+        try {
+            const walletAddress = new PublicKey(address);
 
-        const solBalanceLamports = await this.connection.getBalance(walletAddress);
-        const solBalance = solBalanceLamports / 1e9;
-        return solBalance;
+            const solBalanceLamports = await this.connection.getBalance(walletAddress);
+            const solBalance = solBalanceLamports / 1e9;
+            return solBalance;
+        }
+        catch(error){
+            //error
+        }
     }
     async getWalletTokenBalance(address, token) {
         try {

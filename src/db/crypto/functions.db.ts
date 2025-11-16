@@ -139,7 +139,8 @@ export async function fetchCoin(coinId?:string, params?: CoinWithName) : Promise
                 "coin_id",
                 "coin",
                 "contract_address",
-                "chain_id"
+                "chain_id",
+                "decimals"
             ],
             conditions: {
                 compulsory: compulsoryConditions

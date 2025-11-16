@@ -156,7 +156,7 @@ class TransactionDB extends TransactionsDBQueries {
 
     async confirmTransaction(transactionParam: ConfirmTransactionParam) : Promise<boolean> {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { Webhook, WebhookEvent } = require("../../webhook/webhook");
+        const { Webhook, WebhookEvent } = require("../../services/webhook/webhook");
         const { transactionId, transactionHash, status: transactionStatus, depositReceived } = transactionParam;
 
         try {

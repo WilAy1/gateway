@@ -3,7 +3,7 @@ import { Request } from "express";
 import { Customer, GenerateAddressParams, InitTransactionParams, PaymentMethod, TransactionObject } from "./create_transaction";
 import { TransactionStatus } from '../../../interfaces/TransactionStatus';
 import Table from "../../../db/query";
-import { GWObject, isEmpty, isValidEmail, removeKeys } from "../../../utils/utils";
+import { GWObject, isEmpty, isValidEmail, isValidUUID, removeKeys, toFixed } from "../../../utils/utils";
 import { fetchCoin } from "../../../db/crypto/functions.db";
 import { ChainTypes } from "../../../enums/chain";
 import { getConversionRate } from "../../public/rates/router";
@@ -120,9 +120,8 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
             const contract_address = coinDetails['contract_address'];
             const coinDecimals = coinDetails['decimals'];
 
-            const amount_to_pay = parseFloat(amount_to.toFixed(coinDecimals));
 
-
+            const amount_to_pay = parseFloat(toFixed(amount_to, coinDecimals));
 
 
             // change status to  awaiting_payment
@@ -152,7 +151,7 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
                     price_to,
                     price_from,
                     depositAddress,
-                    amount_to,
+                    amount_to_pay,
                     status,
                     address_generated_at,
                     contract_address
@@ -313,10 +312,10 @@ export async function generatePaymentUrl(issuer: Map<string, unknown>, params: I
         const { amount, currency, customer, callback_url, description, metadata } = params;
         if(!amount || !currency || !customer || (!customer.id && !customer.email)) return { status: false, error: 'invalid_params', message: "Failed to create transaction" }
 
-        if(customer.id) {
+        if(customer.id || customer.email) {
             const customerObj = new Customers(issuer['userId']);
-
-            const customerExists = await customerObj.customerExists({id: customer.id});
+            
+            const customerExists = await customerObj.customerExists({id: customer.id ? customer.id : customer.email});
 
             if(!customerExists && !isValidEmail(customer.email)){
                 return { status: false, error: 'invalid_params', message: "Failed to create transaction - use a valid customer or enter customer id" }
@@ -324,6 +323,9 @@ export async function generatePaymentUrl(issuer: Map<string, unknown>, params: I
 
             if(!isValidEmail(customer.email)){
                 customer.email = customerExists['email'];
+            }
+            if(!isValidUUID(customer.id) && customerExists){
+                customer.id = customerExists.toString();
             }
         }
 

@@ -19,14 +19,14 @@ export function authenticateUser(req, res, next) {
     // Verify the token using the secret key
     jwt.verify(token, env.SECURE_LOGIN_GEN_KEY, async (err, user) => {
       if (err) {
-        return res.status(StatusCodes.FORBIDDEN).json({ error: "forbidden" }); // Forbidden if token is invalid
+        return res.status(StatusCodes.UNAUTHORIZED).json({ error: "unauthorized" }); // Forbidden if token is invalid
       }
       
       // check if token is revoked
 
       const isTokenActive = await verifyLoginToken(user, token);
 
-      if(!isTokenActive) return res.status(StatusCodes.FORBIDDEN).json({ error: "forbidden" });
+      if(!isTokenActive) return res.status(StatusCodes.UNAUTHORIZED).json({ error: "unauthorized" });
 
       req.user = user;
 

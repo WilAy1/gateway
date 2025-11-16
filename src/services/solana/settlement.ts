@@ -106,14 +106,14 @@ class SolanaSettlements {
     // const rentExempt = await this.connection.getMinimumBalanceForRentExemption(0);
     const sender = Keypair.fromSecretKey(transactionWalletData.account_key);
     const balance = await this.connection.getBalance(sender.publicKey);
-    const fee = 5000; // reserve 5000 lamports for tx fee
-    const lamportsToSend = Math.max(balance - fee, 0);
+    const NETWORK_FEE = 5000; // reserve 5000 lamports for tx fee
+    const lamportsToSend = Math.max(balance - NETWORK_FEE, 0);
 
     if (lamportsToSend <= 0) return console.error("No balance to settle."); // log, don't debit
 
     const recipients = [
       {pubKey: new PublicKey(settlementAddress), amount: Math.floor(amountToSend * LAMPORTS_PER_SOL)},
-      {pubKey: this.coldWallet, amount: Math.floor(feeToSend * LAMPORTS_PER_SOL)}
+      {pubKey: this.coldWallet, amount: Math.floor(feeToSend * LAMPORTS_PER_SOL) - NETWORK_FEE}
     ];
     console.log(recipients);
 

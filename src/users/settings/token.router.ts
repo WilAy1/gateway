@@ -6,12 +6,12 @@ import { TokenType } from '../../utils/generate_secure_token';
 export const tokenRouter = express.Router();
 
 
-tokenRouter.post('/generate-token', async (req, res) => {
+tokenRouter.post('/generate-token/private', async (req, res) => {
     try {
         const { userId } = req['user'];
 
         generateApiToken(userId, TokenType.PRIVATE_API).then((token) => {
-            return res.status(StatusCodes.OK).json({ success: "Token generated", token: token })
+            return res.status(StatusCodes.OK).json({ success: true, token: token })
         });
     }
     catch (error) {

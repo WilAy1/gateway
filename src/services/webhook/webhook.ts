@@ -1,17 +1,18 @@
 import axios from 'axios';
 import crypto from 'crypto';
-import {TransactionDB}  from '../db/transactions/transactions.db';
-import { GWObject, isEmpty, removeKeys } from '../utils/utils';
-import Table from '../db/query';
+import {TransactionDB}  from '../../db/transactions/transactions.db';
+import { GWObject, isEmpty, removeKeys } from '../../utils/utils';
+import Table from '../../db/query';
 
 interface WebhookData {
     event: WebhookEvent,
-    data: GWObject
+    payload: GWObject
 }
 
 enum WebhookEvent {
     TRANSACTION_COMPLETED = 'transaction_completed',
-    TRANSACTION_CANCELLED = 'transaction_cancelled'
+    TRANSACTION_CANCELLED = 'transaction_cancelled',
+
 }
 
 
@@ -125,7 +126,7 @@ class Webhook {
         ]);
         const webhookData: WebhookData = {
             event: event,
-            data: updatedTransaction
+            payload: updatedTransaction
         };
         await this.sendWebhook(webhookData);
     }

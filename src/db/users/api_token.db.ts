@@ -1,7 +1,8 @@
-import { generateToken, TokenType } from "../../utils/generate_secure_token";
+import { OrderDirection } from "../../interfaces/db.interface";
+import { TokenType } from "../../utils/generate_secure_token";
 import { isEmpty } from "../../utils/utils";
 import Table from "../query";
-
+import crypto from 'crypto';
 
 export class Tokens {
     private readonly privateTable: Table;
@@ -23,14 +24,17 @@ export class Tokens {
 
     async getPrivate() {
         const result = await this.privateTable.select({
-            cols: ["api_token as token", "status", "owner_id as id", "created_at"],
+            cols: ["api_token as token", "status", "owner_id as id", "created_at", "times_used as usage_count", "last_time_used"],
             conditions: {
                 compulsory: [
                     {
                         key: "owner_id",
                         value: this.ownerId
                     }
-                ]
+                ],
+                orderBy: ["last_time_used", "created_at"],
+                limit: 20,
+                orderDir: OrderDirection.DESCENDING
             }
         });
 
@@ -38,14 +42,17 @@ export class Tokens {
     }
     async getPublic() {
         const result = await this.publicTable.select({
-            cols: ["api_token as token", "status", "owner_id as id", "created_at"],
+            cols: ["api_token as token", "status", "owner_id as id", "created_at", "times_used as usage_count", "last_time_used"],
             conditions: {
                 compulsory: [
                     {
                         key: "owner_id",
                         value: this.ownerId
                     }
-                ]
+                ],
+                orderBy: ["last_time_used", "created_at"],
+                limit: 20,
+                orderDir: OrderDirection.DESCENDING
             }
         });
 
@@ -64,9 +71,12 @@ export class Tokens {
 export async function generateApiToken(userId: string, tokenType: TokenType) : Promise<string> {
     try {
 
-        const apiToken = generateToken(tokenType, {
-            userId: userId
-        });
+        const randomKey = crypto.randomBytes(32).toString("hex");
+        const apiToken = `sk_test_${randomKey}`;
+
+        // const apiToken = generateToken(tokenType, {
+        //     userId: userId
+        // });
 
         let inTable: string;
         if(tokenType == TokenType.PRIVATE_API){
@@ -121,20 +131,13 @@ export async function generateApiToken(userId: string, tokenType: TokenType) : P
 }
 
 
-
-
-export async function isValidApiToken(userDetails, token: string, tokenType: TokenType) : Promise<boolean>{
+export async function isValidApiToken(token: string, tokenType: TokenType): Promise<false | { userId: unknown }> {
     try {
-        const { userId } = userDetails;
         
         const query = new Table(tokenType == TokenType.PRIVATE_API ? "apitokens" : "public_apitokens");
         const result = await query.select({
             conditions: {
                 compulsory: [
-                    {
-                        key: "owner_id",
-                        value: userId
-                    },
                     {
                         key: "api_token",
                         value: token
@@ -151,7 +154,21 @@ export async function isValidApiToken(userDetails, token: string, tokenType: Tok
         if (isEmpty(result)){
             return false;
         }
-        return true;
+        
+        await query.update(['times_used'], [++result[0]['times_used']], {
+                compulsory: [
+                    {
+                        key: "api_token",
+                        value: token
+                    },
+                    {
+                        key: "status",
+                        value: "active"
+                    }
+                ]
+            });
+
+        return { userId: result[0]['owner_id'] };
     }
     catch (error) {
         console.error("Error verifying login token: ", error);
