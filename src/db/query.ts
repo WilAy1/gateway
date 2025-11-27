@@ -1,3 +1,4 @@
+import { PoolClient } from "pg";
 import { Condition, ConditionChild, DBQueryReturnType, DBSelectParams } from "../interfaces/db.interface";
 import { makeObjectUnique } from "../utils/utils";
 import pool from "./connect";
@@ -5,8 +6,9 @@ import pool from "./connect";
 /* eslint-disable @typescript-eslint/no-unused-vars */
 class Table {
     table: string;
-    
-     constructor(table: string){
+    client: PoolClient;
+
+    constructor(table: string){
         this.table = table;
     }
 
@@ -241,7 +243,6 @@ class Table {
             return;
         }
     }
-
 }
 
 export default Table;

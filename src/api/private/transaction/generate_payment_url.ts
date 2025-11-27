@@ -11,6 +11,7 @@ import { QueryResult } from "pg";
 import Solana from "../../../services/solana/solana";
 import Customers from "../../../db/customers/customers";
 import Ethereum from "../../../services/ethereum/ethereum";
+import pool from "../../../db/connect";
 
 const PLATFORM_PAYMENT_URL = "http://localhost:3001/pay";
 
@@ -36,8 +37,10 @@ function initializeDepositTransaction(params){
 
 // no need for issuer
 export async function getDepositAddress(issuer: Map<string, unknown>, params: GenerateAddressParams ) {
-    //
+    const client = await pool.connect();
     try {
+
+        await client.query("BEGIN");
 
         let depositAddress;
 
@@ -212,6 +215,8 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
                 ]);
 
             //startSolanaListening(updatedResult['deposit_address'] as string);
+            
+            await client.query("COMMIT");
 
             return {
                 status : true,
@@ -223,8 +228,12 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
 
     }
     catch(error) {
+        await client.query("ROLLBACK");
         console.error(error);
         throw new Error("Failed to create deposit address");
+    }
+    finally {
+        client.release();
     }
 }
 
@@ -306,7 +315,9 @@ export async function fetchTransaction(issuer: Map<string, unknown>, params) {
 
 // issuer needed
 export async function generatePaymentUrl(issuer: Map<string, unknown>, params: InitTransactionParams){
+    const client = await pool.connect();
     try {
+        await client.query("BEGIN");
         // expected params
         // amount, currency, email
         const { amount, currency, customer, callback_url, description, metadata } = params;
@@ -382,6 +393,7 @@ export async function generatePaymentUrl(issuer: Map<string, unknown>, params: I
 
         const result = await query.insert(keys, values, {returnColumn: "id"});
 
+        await client.query("COMMIT");
 
         if(result) {
             return {
@@ -399,8 +411,12 @@ export async function generatePaymentUrl(issuer: Map<string, unknown>, params: I
         }
     }
     catch(error) {
+        await client.query("ROLLBACK");
         console.error('Error creating transaction: ', error);
         throw new Error('Error creating transaction');
+    }
+    finally {
+        client.release();
     }
 
 

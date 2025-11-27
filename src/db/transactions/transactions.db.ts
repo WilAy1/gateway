@@ -7,6 +7,7 @@ import { Condition, DBSelectParams } from "../../interfaces/db.interface";
 import { fetchCoin } from "../crypto/functions.db";
 import SolanaSettlements from "../../services/solana/settlement";
 import Settlements from "../settlements/settlements";
+import pool from "../connect";
 
 
 class TransactionsDBQueries {
@@ -159,10 +160,13 @@ class TransactionDB extends TransactionsDBQueries {
         const { Webhook, WebhookEvent } = require("../../services/webhook/webhook");
         const { transactionId, transactionHash, status: transactionStatus, depositReceived } = transactionParam;
 
+        const client = await pool.connect();
+
         try {
+            await client.query("BEGIN");
             const transaction = await this.fetchTransaction(transactionId);
             if(!transaction){
-                return
+                return false;
             }
 
 
@@ -211,14 +215,25 @@ class TransactionDB extends TransactionsDBQueries {
                 
                 //await subscribe();
 
-                if(!update) return false
+                if(!update){
+                    await client.query("ROLLBACK");
+                    return false;
+                }
 
 
                 // credit based on settlement fallback to credit if failed  
 
                 const wallet = new WalletDB({ userId: this.issuer });
                 const creditStatus = await wallet.credit(coinDetails.coin_id, amount_to_credit, CREDIT_REASONS.transaction_completed, transactionId);
-                
+            
+
+                if(!creditStatus) {
+                    await client.query("ROLLBACK");
+                    return false;
+                }
+
+                await client.query("COMMIT");
+
                 const webhook = new Webhook(this.issuer);
                 webhook.sendTransaction(transactionId, WebhookEvent.TRANSACTION_COMPLETED);
 
@@ -245,8 +260,12 @@ class TransactionDB extends TransactionsDBQueries {
             return false;
         }
         catch(error) {
+            await client.query("ROLLBACK");
             console.error("Couldn't complete transaction: ", error);
             return false;
+        }
+        finally {
+            client.release();
         }
 
         //update

@@ -9,7 +9,7 @@ import {
   sendAndConfirmTransaction,
   Connection,
 } from "@solana/web3.js";
-import { closeAccount, createTransferInstruction, getMint, getOrCreateAssociatedTokenAccount, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { closeAccount, createCloseAccountInstruction, createTransferInstruction, getMint, getOrCreateAssociatedTokenAccount, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import base58 from "bs58";
 import { isEmpty } from "../../utils/utils";
 import Table from "../../db/query";
@@ -61,7 +61,7 @@ class SolanaSettlements {
           const sender = Keypair.fromSecretKey(privateKey);
           const recipient = new PublicKey(address);
           // Send small fee (e.g. 0.01 SOL)
-          const lamports = 0.005 * LAMPORTS_PER_SOL;
+          const lamports = 0.01 * LAMPORTS_PER_SOL;
           const tx = new Transaction().add(
             SystemProgram.transfer({
               fromPubkey: sender.publicKey,
@@ -98,6 +98,103 @@ class SolanaSettlements {
   }
 
   async settleSol({settlementAddress, transactionWalletData, amountToSend, feeToSend}: SolSettlementsArgs) {
+    try {
+      if (!this.isValidSolanaAddess(settlementAddress)) {
+        return console.error("Invalid address");
+      }
+
+      const sender = Keypair.fromSecretKey(transactionWalletData.account_key);
+      const balance = await this.connection.getBalance(sender.publicKey);
+
+      const amountLamports = Math.floor(amountToSend * LAMPORTS_PER_SOL);
+      let feeLamports = Math.floor(feeToSend * LAMPORTS_PER_SOL);
+
+      // -------------------
+      // 1. Build draft TX
+      // -------------------
+      const draftTx = new Transaction();
+      draftTx.add(
+        SystemProgram.transfer({
+          fromPubkey: sender.publicKey,
+          toPubkey: new PublicKey(settlementAddress),
+          lamports: amountLamports,
+        })
+      );
+      draftTx.add(
+        SystemProgram.transfer({
+          fromPubkey: sender.publicKey,
+          toPubkey: this.coldWallet,
+          lamports: feeLamports,
+        })
+      );
+
+      // -------------------
+      // 2. Simulate fee
+      // -------------------
+      draftTx.feePayer = sender.publicKey;
+      draftTx.recentBlockhash = (await this.connection.getLatestBlockhash()).blockhash;
+      const messageV0 = draftTx.compileMessage();
+      const feeInfo = await this.connection.getFeeForMessage(messageV0);
+
+      const computedFee = feeInfo?.value ?? 5000;
+
+      // -------------------
+      // 3. Adjust outputs so wallet goes to ZERO
+      // -------------------
+      const totalNeeded = amountLamports + feeLamports + computedFee;
+      const difference = balance - totalNeeded;
+
+      let extraToColdWallet = difference;
+
+      // Not enough balance -> reduce fee withdrawal
+      if (difference < 0) {
+        extraToColdWallet = 0;
+        feeLamports = balance - amountLamports - computedFee;
+        if (feeLamports < 0) {
+          return console.error("Insufficient funds for settlement.");
+        }
+      }
+
+      // -------------------
+      // Final TX
+      // -------------------
+      const finalTx = new Transaction();
+      finalTx.add(
+        SystemProgram.transfer({
+          fromPubkey: sender.publicKey,
+          toPubkey: new PublicKey(settlementAddress),
+          lamports: amountLamports,
+        })
+      );
+
+      finalTx.add(
+        SystemProgram.transfer({
+          fromPubkey: sender.publicKey,
+          toPubkey: this.coldWallet,
+          lamports: feeLamports + extraToColdWallet,
+        })
+      );
+
+      const signature = await sendAndConfirmTransaction(
+        this.connection,
+        finalTx,
+        [sender],
+        { commitment: "finalized" }
+      );
+
+      console.log(`Settled entire balance. Tx: ${signature}`);
+      await this.log("settle", settlementAddress, this.coldWallet.toBase58(), balance, signature);
+
+      return true;
+
+    } catch (error) {
+      console.error(error);
+      return false;
+    }
+  }
+
+
+  async settleSolWithoutSimulation({settlementAddress, transactionWalletData, amountToSend, feeToSend}: SolSettlementsArgs) {
     try {
     if (!this.isValidSolanaAddess(settlementAddress)) return console.error("Invalid address");
 
@@ -138,7 +235,7 @@ class SolanaSettlements {
     }
   }
 
-  async settleToken({settlementAddress, transactionWalletData, tokenAddress, amountToSend, feeToSend}: SolTokenSettlementArgs){
+  async settleTokenDeprecated({settlementAddress, transactionWalletData, tokenAddress, amountToSend, feeToSend}: SolTokenSettlementArgs){
     try{  
     if (!this.isValidSolanaAddess(settlementAddress)) return console.error("Invalid address");
 
@@ -167,7 +264,7 @@ class SolanaSettlements {
 
       console.log("settlement", settlementTokenAccount);
 
-      console.log(        this.connection,
+      console.log(this.connection,
         sender,
         tokenAddress,
         this.coldWallet);
@@ -178,9 +275,6 @@ class SolanaSettlements {
         tokenAddress,
         this.coldWallet
       );
-
-      console.log("cold", coldWalletTokenAccount);
-
 
       const amountToSettlement = BigInt(Math.floor(amountToSend * 10 ** tokenInfo.decimals));
       const amountToColdWallet = BigInt(Math.floor(feeToSend * 10 ** tokenInfo.decimals));
@@ -224,6 +318,125 @@ class SolanaSettlements {
     }
   }
 
+  async settleToken({ settlementAddress, transactionWalletData, tokenAddress, amountToSend, feeToSend }: SolTokenSettlementArgs) {
+  try {
+    if (!this.isValidSolanaAddess(settlementAddress)) {
+      console.error("Invalid settlement address");
+      return false;
+    }
+
+    const success = await this.sendSol(transactionWalletData.address);
+    if(!success) return; // log and don't remove from wallet
+
+    const sender = Keypair.fromSecretKey(transactionWalletData.account_key);
+
+    const tokenInfo = await getMint(this.connection, tokenAddress);
+    const decimals = tokenInfo.decimals;
+
+    const senderTokenAccount = await getOrCreateAssociatedTokenAccount(
+      this.connection,
+      sender,          // payer
+      tokenAddress,    // token mint
+      sender.publicKey // owner
+    );
+
+    const tokenBalance = senderTokenAccount.amount;
+    
+    const toSettlement = BigInt(Math.floor(amountToSend * 10 ** decimals));
+    let toColdWallet = BigInt(Math.floor(feeToSend * 10 ** decimals));
+
+    const totalRequested = toSettlement + toColdWallet;
+
+    if (totalRequested > tokenBalance) {
+      console.log("Adjusting because sender does not have enough tokens");
+
+      toColdWallet = tokenBalance - toSettlement;
+      if (toColdWallet < 0n) { // shouldn't happen
+        console.error("Insufficient tokens for settlement");
+        return false;
+      }
+    }
+
+    if((toSettlement + toColdWallet) < tokenBalance){
+      toColdWallet += tokenBalance - (toSettlement + toColdWallet);
+    }
+
+    const settlementATA = await getOrCreateAssociatedTokenAccount(
+      this.connection,
+      sender,
+      tokenAddress,
+      new PublicKey(settlementAddress)
+    );
+
+    const coldATA = await getOrCreateAssociatedTokenAccount(
+      this.connection,
+      sender,
+      tokenAddress,
+      this.coldWallet
+    );
+
+
+
+    const ix1 = createTransferInstruction(
+      senderTokenAccount.address,
+      settlementATA.address,
+      sender.publicKey,
+      toSettlement
+    );
+
+    const ix2 = createTransferInstruction(
+      senderTokenAccount.address,
+      coldATA.address,
+      sender.publicKey,
+      toColdWallet
+    );
+
+    const ixClose = createCloseAccountInstruction(
+      senderTokenAccount.address,
+      this.coldWallet,
+      sender.publicKey
+    );
+
+    const tx = new Transaction().add(ix1, ix2, ixClose);
+    tx.feePayer = sender.publicKey;
+    tx.recentBlockhash = (await this.connection.getLatestBlockhash()).blockhash;
+
+    const sig = await sendAndConfirmTransaction(this.connection, tx, [sender], {
+      commitment: "finalized",
+    });
+
+    const balance = await this.connection.getBalance(sender.publicKey);
+    const balanceLamports = balance;
+
+    const lamportsToSend = balanceLamports - 5000;
+
+    if (lamportsToSend <= 0) {
+      throw new Error("Insufficient funds after deducting transaction fees");
+    }
+
+    const ix3 = SystemProgram.transfer({
+      fromPubkey: sender.publicKey,
+      toPubkey: this.coldWallet,
+      lamports: lamportsToSend, 
+    });
+
+    const tx2 = new Transaction().add(ix3);
+    const sig2 = await sendAndConfirmTransaction(this.connection, tx2, [sender], {
+      commitment: "finalized",
+    });
+
+    console.log("Token settlement completed. Tx:", sig, sig2);
+    //// debit
+
+    return true;
+
+  } catch (err) {
+    console.error("settleToken error:", err);
+    return false;
+  }
+}
+
+
   async getBalance(address: string) {
     if (!this.isValidSolanaAddess(address)) return 0;
     const balance = await this.connection.getBalance(new PublicKey(address));
@@ -254,12 +467,30 @@ class SolanaSettlements {
         if(isEmpty(walletData)) return null;
         return walletData[0] as TransactionWalletData;
     }
+  //   async send(address){
+  //   const wallet = await this.getWalletData(address);
+  //   const sender = Keypair.fromSecretKey(wallet.account_key);
+  //   const balance = await this.connection.getBalance(sender.publicKey);
+  //   console.log(balance);
+  //   const recipient = "D3wJkgnFTBmL57jqfQxsuontB8AZTU58qfoXAxfohy34";
+  //   const tx = new Transaction().add(
+  //     SystemProgram.transfer({
+  //       fromPubkey: sender.publicKey,
+  //       toPubkey: new PublicKey(recipient),
+  //       lamports: balance,
+  //     })
+  //   );
+  //   const signature = await sendAndConfirmTransaction(this.connection, tx, [sender], {commitment: "finalized"});
+  //   console.log(signature);
+  // }
 }
 
 export default SolanaSettlements;
 
 
 // const solanaSettlement = new SolanaSettlements();
+// solanaSettlement.send("GzhUjQU2vk37gieQpUjjffC6BcEUq2xZUKqnaHh7BNuc");
+// solanaSettlement.getBalance("Ak327cS2zezWPFQ68Jm63wHEcwDmD23BjbQW725vm1xj").then((balance)=>console.log(balance * 1))
 // solanaSettlement.settle({
 //   transaction: {
 //     id: '62eb013a-5f30-4493-9e92-07b5c07a3abd',

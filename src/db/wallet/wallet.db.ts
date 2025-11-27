@@ -96,6 +96,7 @@ class WalletDBQueries{
 
     protected async updateUserAsset(coinId: UUID, amount: number) {
         try {
+            console.log(amount);
             const asset = await this.getUserAsset(coinId);
             if(asset) {
                 await this.wallet_table.update(
@@ -284,7 +285,7 @@ class WalletDB extends WalletDBQueries {
         let newAmount = amount;
         if(asset){
             const currentAmount = parseFloat(asset["balance"]);
-            newAmount -= currentAmount;
+            newAmount = currentAmount - newAmount;
         }
         const date = new Date();
         const currentIsoTIme = date.toISOString();
