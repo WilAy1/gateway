@@ -164,7 +164,7 @@ class Table {
     }
 
 
-    async insert(keys: string[], values: unknown[], { returnColumn } : {returnColumn: string} = {returnColumn : null}) : Promise<boolean> {
+    async insert(keys: string[], values: unknown[], { returnColumn } : {returnColumn: string} = {returnColumn : null}) : Promise<boolean | unknown> {
         try {
             if(keys.length == 0 && keys.length != values.length) {
                 throw new Error("Length of keys doesn't match length of values");
@@ -172,7 +172,6 @@ class Table {
 
             const query : string = this.generateInsertQuery(keys, values, returnColumn);
             const response = await pool.query(query, values); // insert into table
-
 
             return response.rows[0];
 

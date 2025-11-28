@@ -6,6 +6,8 @@ import { userRouter } from './users/router';
 import { monitorPending, resubscribe } from './services/solana/solana';
 import Rates from './services/rates/rates';
 import { StatusCodes } from 'http-status-codes';
+import { Webhook } from './services/webhook/webhook';
+import { WebhookEvent } from './interfaces/webhook';
 // import listEndpoints from 'express-list-endpoints';
 // import { listTree } from './others/others';
 // import path from 'path';
@@ -31,6 +33,23 @@ app.use(cors())
 app.use(express.json());
 
 
+// app.post('/webhook', express.raw({type: "*/*" }), (req, res) => {
+//   const logEntry = {
+//     timestamp: new Date().toISOString(),
+//     method: req.method,
+//     url: req.originalUrl,
+//     ip: req.ip,
+//     headers: req.headers,
+//     rawBody: req.body, // important!
+//     parsedBody: req.body,
+//   };
+
+//   console.log("📩 Incoming webhook:", JSON.stringify(logEntry, null, 2));
+
+//   // Respond quickly — providers expect fast ACK
+//   res.status(200).send("ok");
+// });
+
 
 app.use('/api/p', privateRouter);
 app.use('/api/', publicRouter);
@@ -40,6 +59,7 @@ app.use('/', userRouter);
 app.listen(port, () => {
     return console.log(`Express server is listening at http://localhost:${port} 🚀`);
 });
+
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err, req, res, _) => {
@@ -82,22 +102,6 @@ app.post('*', function(req, res){
 // webhook.sendTransaction("62eb013a-5f30-4493-9e92-07b5c07a3abd", WebhookEvent.TRANSACTION_COMPLETED);
 
 
-// app.post('/webhook', express.raw({type: "*/*" }), (req, res) => {
-//   const logEntry = {
-//     timestamp: new Date().toISOString(),
-//     method: req.method,
-//     url: req.originalUrl,
-//     ip: req.ip,
-//     headers: req.headers,
-//     rawBody: req.body, // important!
-//     parsedBody: req.body,
-//   };
-
-//   console.log("📩 Incoming webhook:", JSON.stringify(logEntry, null, 2));
-
-//   // Respond quickly — providers expect fast ACK
-//   res.status(200).send("ok");
-// });
 
 
 

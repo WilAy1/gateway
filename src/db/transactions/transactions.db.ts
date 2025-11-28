@@ -8,6 +8,8 @@ import { fetchCoin } from "../crypto/functions.db";
 import SolanaSettlements from "../../services/solana/settlement";
 import Settlements from "../settlements/settlements";
 import pool from "../connect";
+import { WebhookEvent } from "../../interfaces/webhook";
+import { Webhook } from "../../services/webhook/webhook";
 
 
 class TransactionsDBQueries {
@@ -51,6 +53,33 @@ class TransactionsDBQueries {
                             key: "issuer_id",
                             value: this.issuer
                         },
+                        {
+                            key: "id",
+                            value: transaction_id
+                        },        
+                    ]
+                }
+            });
+
+
+            if(isEmpty(transaction)){
+                return;
+            }
+            return transaction[0] as GWObject;
+
+        }
+        catch(error){
+            console.error(error);
+            throw new Error("Error fetching transaction");
+        }   
+    }
+
+    protected async fetchWithoutIssuer(transaction_id){
+        try {
+    
+            const transaction = await this.transactions.select({
+                conditions: {
+                    compulsory: [
                         {
                             key: "id",
                             value: transaction_id
@@ -147,6 +176,12 @@ class TransactionDB extends TransactionsDBQueries {
             ]};
 
             const update = await this.updateTransaction(id, ['cancelled_at', 'status'], [isoTime, TransactionStatus.CANCELLED], conditions);
+
+            if(update){
+                const transaction  = await this.fetchWithoutIssuer(id);
+                const webhook = new Webhook(transaction["issuer_id"]);
+                webhook.sendTransaction(id, WebhookEvent.TRANSACTION_CANCELLED);
+            }
 
             return update;
         }

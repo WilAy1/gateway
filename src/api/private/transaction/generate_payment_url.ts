@@ -12,6 +12,8 @@ import Solana from "../../../services/solana/solana";
 import Customers from "../../../db/customers/customers";
 import Ethereum from "../../../services/ethereum/ethereum";
 import pool from "../../../db/connect";
+import { Webhook } from "../../../services/webhook/webhook";
+import { WebhookEvent } from "../../../interfaces/webhook";
 
 const PLATFORM_PAYMENT_URL = "http://localhost:3001/pay";
 
@@ -396,6 +398,8 @@ export async function generatePaymentUrl(issuer: Map<string, unknown>, params: I
         await client.query("COMMIT");
 
         if(result) {
+            const webhook = new Webhook(issuer['userId']);
+            webhook.sendTransaction(result["id"], WebhookEvent.TRANSACTION_CREATED);
             return {
                 status: true,
                 message: "Transaction generated",
