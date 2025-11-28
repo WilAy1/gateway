@@ -93,7 +93,7 @@ export default class WebhookDB {
         }
     }
 
-    async deleteWebhook({id: id}){
+    async deleteWebhook({id}){
         if(!this.userId) throw new Error("User id is required");
         try {
             return await this.webhookTable.delete({
@@ -115,7 +115,7 @@ export default class WebhookDB {
         }
     }
 
-    async fetchWebhooks({webhookId = null, event = null}) {
+    async fetchWebhooks({webhookId = null, event = null} = {}) {
         if(!this.userId) throw new Error("User id is required");
         try {
             const compulsoryConditions = [

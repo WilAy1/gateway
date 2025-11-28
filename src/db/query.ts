@@ -203,7 +203,7 @@ class Table {
             
             
             //console.log(query, conditionValues)
-            //await pool.query(query, conditionValues); // insert into table
+            await pool.query(query, conditionValues); // insert into table
 
 
             return true
