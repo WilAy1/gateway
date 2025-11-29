@@ -6,8 +6,6 @@ import { userRouter } from './users/router';
 import { monitorPending, resubscribe } from './services/solana/solana';
 import Rates from './services/rates/rates';
 import { StatusCodes } from 'http-status-codes';
-import { Webhook } from './services/webhook/webhook';
-import { WebhookEvent } from './interfaces/webhook';
 // import listEndpoints from 'express-list-endpoints';
 // import { listTree } from './others/others';
 // import path from 'path';

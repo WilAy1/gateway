@@ -1,13 +1,39 @@
-async function fnFetchAllRefunds({customer_id} = null){
+import { sendErrroResponse } from "../../../utils/responseHandler";
 
+async function fnFetchAllRefunds(req, res){
+    try {
+        //
+    }
+    catch {
+        return sendErrroResponse(res, "Internal server error");
+    }
 }
 
-async function fnFetchRefund({id}){
-    const re
+async function fnFetchRefund(req, res){
+    try {
+//
+    }
+    catch {
+        return sendErrroResponse(res, "Internal server error");
+    }
 }
 
-async function fnCreateRefund(){
-
+async function fnCreateRefund(req, res){
+    try {
+//
+    }
+    catch {
+        return sendErrroResponse(res, "Internal server error");
+    }
 }
 
-export { fnFetchAllRefunds, fnFetchRefund, fnCreateRefund };
+async function fnUpdateRefund(req, res) {
+    try {
+//
+    }
+    catch {
+        return sendErrroResponse(res, "Internal server error");
+    }
+}
+
+export { fnFetchAllRefunds, fnFetchRefund, fnCreateRefund, fnUpdateRefund };

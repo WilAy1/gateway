@@ -17,6 +17,12 @@ import { WebhookEvent } from "../../../interfaces/webhook";
 
 const PLATFORM_PAYMENT_URL = "http://localhost:3001/pay";
 
+/**
+ * 
+ * @param params 
+ * @deprecated
+ * @returns 
+ */
 function initializeDepositTransaction(params){
     const { amount, currency, coin, chain, refund_address, email} = params;
 

@@ -158,3 +158,71 @@ CREATE TABLE webhook_deliveries (
 CREATE INDEX idx_deliveries_webhook ON webhook_deliveries(webhook_id);
 CREATE INDEX idx_deliveries_event ON webhook_deliveries(event_id);
 CREATE INDEX idx_deliveries_status ON webhook_deliveries(status);
+
+
+
+
+CREATE TABLE refunds(
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    issuer_id UUID NOT NULL,
+    transaction_id UUID NOT NULL REFERENCES transactions(id),
+    refund_amount  numeric(20, 8) NOT NULL CHECK (refund_amount <= original_amount),
+    original_amount numeric(20, 8) NOT NULL,
+    coin TEXT,
+
+    refund_method TEXT NOT NULL DEFAULT 'gateway',
+    refund_address TEXT NOT NULL,
+    status VARCHAR(16) NOT NULL CHECK (status IN ('initialized', 'awaiting_payment', 'completed', 'failed', 'cancelled', 'expired')),
+    reason_for_refund TEXT,
+    failure_reason TEXT,
+    -- refund_reference TEXT NOT NULL UNIQUE,
+    refund_tx_hash TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    completed_at TIMESTAMP
+);
+
+
+CREATE TRIGGER set_timestamp_refunds
+BEFORE UPDATE ON refunds
+FOR EACH ROW
+EXECUTE PROCEDURE set_timestamp();
+CREATE INDEX idx_refunds_transaction_id ON refunds(transaction_id);
+CREATE INDEX idx_refunds_issuer_id ON refunds(issuer_id);
+
+CREATE OR REPLACE FUNCTION check_total_refund_amount()
+RETURNS TRIGGER AS $$
+DECLARE
+    total_refunded NUMERIC;
+    transaction_original NUMERIC;
+BEGIN
+    -- Get current total refunded for this transaction (excluding this row in case of update)
+    SELECT COALESCE(SUM(refund_amount),0)
+    INTO total_refunded
+    FROM refunds
+    WHERE transaction_id = NEW.transaction_id
+      AND id <> NEW.id;
+
+    -- Get the original amount from transactions table
+    SELECT original_amount
+    INTO transaction_original
+    FROM transactions
+    WHERE id = NEW.transaction_id;
+
+    -- Add the new refund_amount
+    total_refunded := total_refunded + NEW.refund_amount;
+
+    IF total_refunded > transaction_original THEN
+        RAISE EXCEPTION 'Total refunds (%.8f) exceed original transaction amount (%.8f)',
+            total_refunded, transaction_original;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE TRIGGER check_total_refunds_trigger
+BEFORE INSERT OR UPDATE ON refunds
+FOR EACH ROW
+EXECUTE PROCEDURE check_total_refund_amount();
