@@ -246,7 +246,7 @@ export async function getDepositAddress(issuer: Map<string, unknown>, params: Ge
 }
 
 
-export async function fetchTransaction(issuer: Map<string, unknown>, params) {
+export async function fetchTransaction(issuer: Map<string, unknown>, params, addCustomer = false) {
     try {
         const query = new Table("transactions");
         const merchantTable = new Table("users");
@@ -282,13 +282,9 @@ export async function fetchTransaction(issuer: Map<string, unknown>, params) {
 
 
         if(!isEmpty(transaction) && !isEmpty(merchant)) {
-
-            const updatedResult = removeKeys(transaction[0] as GWObject, 
-                [
+            const keys = [
                 'issuer_id',
                 'description',
-                'customer_id',
-                "customer_email",
                 "customer_metadata",
                 "application_fee",
                 "fee_denomination",
@@ -296,7 +292,12 @@ export async function fetchTransaction(issuer: Map<string, unknown>, params) {
                 "device_type",
                 "useragent",
                 "ipaddress" 
-                ]);
+                ];
+            if(!addCustomer) {
+                keys.push('customer_id', "customer_email",)
+            }
+            const updatedResult = removeKeys(transaction[0] as GWObject, 
+                keys);
 
             
             //startSolanaListening(updatedResult['deposit_address'] as string);

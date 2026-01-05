@@ -143,6 +143,8 @@ export default class Customers {
         }
     }
 
+    async allGuests() {}
+
     async get({id} : {id?: string}){ // id can be ID or email
         if(!isValidEmail(id) && !isValidUUID(id)){
             return;

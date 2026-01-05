@@ -101,7 +101,7 @@ export async function fnAllTransaction(req, res) {
                 "address_generated_at"
             ],
             conditions: conditions
-        });
+        }, true);
 
         if(!response) {
             return res.status(StatusCodes.BAD_REQUEST).json({

@@ -2,6 +2,7 @@ import express from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { generateApiToken, Tokens } from '../../db/users/api_token.db';
 import { TokenType } from '../../utils/generate_secure_token';
+import { sendErrroResponse, sendSuccessResponse } from '../../utils/responseHandler';
 
 export const tokenRouter = express.Router();
 
@@ -9,8 +10,10 @@ export const tokenRouter = express.Router();
 tokenRouter.post('/generate-token/private', async (req, res) => {
     try {
         const { userId } = req['user'];
+        let { name } = req.body;
+        if(!name) name = "Private Key " + generateRandomChars(4);
 
-        generateApiToken(userId, TokenType.PRIVATE_API).then((token) => {
+        generateApiToken(userId, TokenType.PRIVATE_API, name).then((token) => {
             return res.status(StatusCodes.OK).json({ success: true, token: token })
         });
     }
@@ -24,7 +27,9 @@ tokenRouter.post('/generate-token/private', async (req, res) => {
 tokenRouter.post('/generate-token/public', async (req, res) => {
     try {
         const { userId } = req['user'];
-        generateApiToken(userId, TokenType.PUBLIC_API).then((token)=> {
+        let { name } = req.body;
+        if(!name) name = "Public Key " + generateRandomChars(4);
+        generateApiToken(userId, TokenType.PUBLIC_API, name).then((token)=> {
             return res.status(StatusCodes.OK).json({ success: true, message: "Token generated", data: { token: token } })
         })
     } 
@@ -46,3 +51,38 @@ tokenRouter.get('/fetch', async (req, res) => {
         return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ success: false, message: "Internal server error" })
     }
 })
+
+tokenRouter.post('/revoke', async (req, res)=>{
+    try {
+        const { userId } = req['user'];
+        const { id, type } = req.body;
+        if(!id || !type) return sendErrroResponse(res, "Invalid request parameters");
+        const tokenClass = new Tokens(userId);
+        let success: boolean;
+        if(type == "private"){
+            success = await tokenClass.revokePrivate(id);
+        }
+        else {
+            success = await tokenClass.revokePublic(id);
+        }
+
+        if(success) return sendSuccessResponse(res, {}, {message: "Key revoked successfully" })
+        else return sendErrroResponse(res, "An error occured while revoking key.");
+        
+
+    } 
+    catch (error) {
+        console.error("Error in route /generate-token/public", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "Internal server error" })
+    }
+})
+
+
+function generateRandomChars(length) {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let result = "";
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}

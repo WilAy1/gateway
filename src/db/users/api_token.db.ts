@@ -24,12 +24,16 @@ export class Tokens {
 
     async getPrivate() {
         const result = await this.privateTable.select({
-            cols: ["api_token as token", "status", "owner_id as id", "created_at", "times_used as usage_count", "last_time_used"],
+            cols: ["api_token as token", "status", "api_token_id as id", "name", "created_at", "times_used as usage_count", "last_time_used"],
             conditions: {
                 compulsory: [
                     {
                         key: "owner_id",
                         value: this.ownerId
+                    },
+                    {
+                        key: "status",
+                        value: "active"
                     }
                 ],
                 orderBy: ["last_time_used", "created_at"],
@@ -42,12 +46,16 @@ export class Tokens {
     }
     async getPublic() {
         const result = await this.publicTable.select({
-            cols: ["api_token as token", "status", "owner_id as id", "created_at", "times_used as usage_count", "last_time_used"],
+            cols: ["api_token as token", "status", "api_token_id as id", "name", "created_at", "times_used as usage_count", "last_time_used"],
             conditions: {
                 compulsory: [
                     {
                         key: "owner_id",
                         value: this.ownerId
+                    },
+                    {
+                        key: "status",
+                        value: "active"
                     }
                 ],
                 orderBy: ["last_time_used", "created_at"],
@@ -65,10 +73,68 @@ export class Tokens {
             "public": await this.getPublic()
         };
     }
+
+    async revokePublic(tokenId) {
+        try {
+            return await this.publicTable.update(
+                [
+                    "status",
+                ],
+                [
+                    "revoked"
+                ],
+                {
+                    compulsory: [
+                        {
+                            key: "owner_id",
+                            value: this.ownerId
+                        },
+                        {
+                            key: "api_token_id",
+                            value: tokenId
+                        }
+                    ]
+                }
+            )
+        }
+        catch(error) {
+            console.error(error);
+            throw error;
+        }
+    }
+
+    async revokePrivate(tokenId) {
+        try {
+            return await this.privateTable.update(
+                [
+                    "status",
+                ],
+                [
+                    "revoked"
+                ],
+                {
+                    compulsory: [
+                        {
+                            key: "owner_id",
+                            value: this.ownerId
+                        },
+                        {
+                            key: "api_token_id",
+                            value: tokenId
+                        }
+                    ]
+                }
+            )
+        }
+        catch(error) {
+            console.error(error);
+            throw error;
+        }
+    }
 }
 
 
-export async function generateApiToken(userId: string, tokenType: TokenType) : Promise<string> {
+export async function generateApiToken(userId: string, tokenType: TokenType, name: string) : Promise<string> {
     try {
 
         const randomKey = crypto.randomBytes(32).toString("hex");
@@ -91,22 +157,22 @@ export async function generateApiToken(userId: string, tokenType: TokenType) : P
 
         const query = new Table(inTable); 
 
-        await query.update(
-            [
-                "status",
-            ],
-            [
-                "revoked"
-            ],
-            {
-                compulsory: [
-                    {
-                        key: "owner_id",
-                        value: userId
-                    }
-                ]
-            }
-        )
+        // await query.update(
+        //     [
+        //         "status",
+        //     ],
+        //     [
+        //         "revoked"
+        //     ],
+        //     {
+        //         compulsory: [
+        //             {
+        //                 key: "owner_id",
+        //                 value: userId
+        //             }
+        //         ]
+        //     }
+        // )
 
 
         await query.insert([
@@ -114,12 +180,14 @@ export async function generateApiToken(userId: string, tokenType: TokenType) : P
             "api_token",
             "owner_id",
             "last_time_used",
-            "expires_at"
+            "expires_at",
+            "name"
         ], [
             apiToken,
             userId,
             "infinity",
-            "infinity"
+            "infinity",
+            name
         ]);
 
         return apiToken;
@@ -128,6 +196,7 @@ export async function generateApiToken(userId: string, tokenType: TokenType) : P
         console.log("Error generating api token: ", error);
         throw new Error("Failed to generate api token")
     }
+
 }
 
 

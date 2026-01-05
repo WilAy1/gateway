@@ -22,7 +22,8 @@ class TransactionsDBQueries {
         if(issuer) this.issuer = issuer;
     }
 
-    async fetchTransactions(params?: DBSelectParams) : Promise<Array<GWObject>> {
+    async fetchTransactions(params?: DBSelectParams, useStats?) : Promise<Array<GWObject>|Record<string, unknown>> {
+        console.log(useStats);
         try {
             const transaction = await this.transactions.select(params || {
                 conditions: {
@@ -34,7 +35,13 @@ class TransactionsDBQueries {
                     ]
                 }
             });
-            return transaction as Array<GWObject>;
+            if(!useStats) return transaction as Array<GWObject>;
+            const stats = await this.transactions.customQuery(`SELECT COUNT(*) AS total_txn, 
+                                    COUNT(CASE WHEN status='completed' THEN 1 END) AS completed_txn, 
+                                    COUNT(CASE WHEN status IN ('awaiting_payment', 'awaiting_confirmation') THEN 1 END) AS pending_txn,
+                                    COUNT(CASE WHEN status='cancelled' THEN 1 END) AS cancelled_txn FROM transactions`, []);
+
+            return {txns: transaction, stats: stats['rows'][0]};
 
         }
         catch(error){

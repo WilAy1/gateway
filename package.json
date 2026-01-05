@@ -54,6 +54,7 @@
     "nodemon": "^3.1.0",
     "pg": "^8.11.3",
     "pg-pool": "^3.6.1",
+    "react-redux": "^9.2.0",
     "redis": "^4.6.15",
     "save": "^2.9.0",
     "save-dev": "^0.0.1-security",

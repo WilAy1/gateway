@@ -5,6 +5,7 @@ import { OrderDirection } from '../../interfaces/db.interface';
 import { StatusCodes } from 'http-status-codes';
 import { removeKeys } from '../../utils/utils';
 import { fnAllTransaction, fnParticularTransaction } from '../../api/private/transaction/create_transaction';
+import { fetchTransaction } from '../../api/private/transaction/generate_payment_url';
 
 export const userTransactionRouter = express.Router();
 
@@ -62,7 +63,7 @@ async function asyncd (req, res){
             orderBy: ["created_at"],
             orderDir: OrderDirection.DESCENDING
         }
-    });
+    }, true);
 
 
 
@@ -72,7 +73,32 @@ async function asyncd (req, res){
 
 
 
-userTransactionRouter.get("/fetch", fnParticularTransaction);
+userTransactionRouter.get("/fetch", async (req, res)=>{
+    try {
+        const issuer = req['user'];
+
+        const transaction_params = req.query;
+
+        const response = await fetchTransaction(issuer, transaction_params, true);
+
+        if(!response.status) {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                error: response.error,
+                message: response.message
+            })
+        }
+
+        return res.status(StatusCodes.OK).json({
+            success: true,
+            message: response.message,
+            data: response.result
+        })
+        
+    }
+    catch(error) {
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "Internal Server Error" });    
+    }
+});
 // userTransactionRouter.get("/fetch:id", async (req, res) => {
 //     const { id } = req.params;
 
