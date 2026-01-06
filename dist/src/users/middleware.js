@@ -19,12 +19,12 @@ function authenticateUser(req, res, next) {
     // Verify the token using the secret key
     jsonwebtoken_1.default.verify(token, process_1.env.SECURE_LOGIN_GEN_KEY, async (err, user) => {
         if (err) {
-            return res.status(http_status_codes_1.StatusCodes.FORBIDDEN).json({ error: "forbidden" }); // Forbidden if token is invalid
+            return res.status(http_status_codes_1.StatusCodes.UNAUTHORIZED).json({ error: "unauthorized" }); // Forbidden if token is invalid
         }
         // check if token is revoked
         const isTokenActive = await (0, auth_db_1.verifyLoginToken)(user, token);
         if (!isTokenActive)
-            return res.status(http_status_codes_1.StatusCodes.FORBIDDEN).json({ error: "forbidden" });
+            return res.status(http_status_codes_1.StatusCodes.UNAUTHORIZED).json({ error: "unauthorized" });
         req.user = user;
         loggingMiddleware(req, res, next);
     });

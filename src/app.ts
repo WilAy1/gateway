@@ -53,8 +53,8 @@ app.use('/api/p', privateRouter);
 app.use('/api/', publicRouter);
 app.use('/', userRouter);
   
-
-app.listen(port, () => {
+const host = '0.0.0.0';
+app.listen(port, host, () => {
     return console.log(`Express server is listening at http://localhost:${port} 🚀`);
 });
 

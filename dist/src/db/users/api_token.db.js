@@ -4,9 +4,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.isValidApiToken = exports.generateApiToken = exports.Tokens = void 0;
+const db_interface_1 = require("../../interfaces/db.interface");
 const generate_secure_token_1 = require("../../utils/generate_secure_token");
 const utils_1 = require("../../utils/utils");
 const query_1 = __importDefault(require("../query"));
+const crypto_1 = __importDefault(require("crypto"));
 class Tokens {
     constructor(userId) {
         this.privateTable = new query_1.default("apitokens");
@@ -19,28 +21,42 @@ class Tokens {
     }
     async getPrivate() {
         const result = await this.privateTable.select({
-            cols: ["api_token as token", "status", "owner_id as id", "created_at"],
+            cols: ["api_token as token", "status", "api_token_id as id", "name", "created_at", "times_used as usage_count", "last_time_used"],
             conditions: {
                 compulsory: [
                     {
                         key: "owner_id",
                         value: this.ownerId
+                    },
+                    {
+                        key: "status",
+                        value: "active"
                     }
-                ]
+                ],
+                orderBy: ["last_time_used", "created_at"],
+                limit: 20,
+                orderDir: db_interface_1.OrderDirection.DESCENDING
             }
         });
         return result;
     }
     async getPublic() {
         const result = await this.publicTable.select({
-            cols: ["api_token as token", "status", "owner_id as id", "created_at"],
+            cols: ["api_token as token", "status", "api_token_id as id", "name", "created_at", "times_used as usage_count", "last_time_used"],
             conditions: {
                 compulsory: [
                     {
                         key: "owner_id",
                         value: this.ownerId
+                    },
+                    {
+                        key: "status",
+                        value: "active"
                     }
-                ]
+                ],
+                orderBy: ["last_time_used", "created_at"],
+                limit: 20,
+                orderDir: db_interface_1.OrderDirection.DESCENDING
             }
         });
         return result;
@@ -51,13 +67,63 @@ class Tokens {
             "public": await this.getPublic()
         };
     }
+    async revokePublic(tokenId) {
+        try {
+            return await this.publicTable.update([
+                "status",
+            ], [
+                "revoked"
+            ], {
+                compulsory: [
+                    {
+                        key: "owner_id",
+                        value: this.ownerId
+                    },
+                    {
+                        key: "api_token_id",
+                        value: tokenId
+                    }
+                ]
+            });
+        }
+        catch (error) {
+            console.error(error);
+            throw error;
+        }
+    }
+    async revokePrivate(tokenId) {
+        try {
+            return await this.privateTable.update([
+                "status",
+            ], [
+                "revoked"
+            ], {
+                compulsory: [
+                    {
+                        key: "owner_id",
+                        value: this.ownerId
+                    },
+                    {
+                        key: "api_token_id",
+                        value: tokenId
+                    }
+                ]
+            });
+        }
+        catch (error) {
+            console.error(error);
+            throw error;
+        }
+    }
 }
 exports.Tokens = Tokens;
-async function generateApiToken(userId, tokenType) {
+async function generateApiToken(userId, tokenType, name) {
     try {
-        const apiToken = (0, generate_secure_token_1.generateToken)(tokenType, {
-            userId: userId
-        });
+        const randomKey = crypto_1.default.randomBytes(32).toString("hex");
+        const apiToken = `sk_test_${randomKey}`;
+        // const apiToken = generateToken(tokenType, {
+        //     userId: userId
+        // });
         let inTable;
         if (tokenType == generate_secure_token_1.TokenType.PRIVATE_API) {
             inTable = "apitokens";
@@ -69,29 +135,35 @@ async function generateApiToken(userId, tokenType) {
             throw Error("Invalid token type");
         }
         const query = new query_1.default(inTable);
-        await query.update([
-            "status",
-        ], [
-            "revoked"
-        ], {
-            compulsory: [
-                {
-                    key: "owner_id",
-                    value: userId
-                }
-            ]
-        });
+        // await query.update(
+        //     [
+        //         "status",
+        //     ],
+        //     [
+        //         "revoked"
+        //     ],
+        //     {
+        //         compulsory: [
+        //             {
+        //                 key: "owner_id",
+        //                 value: userId
+        //             }
+        //         ]
+        //     }
+        // )
         await query.insert([
             // keys
             "api_token",
             "owner_id",
             "last_time_used",
-            "expires_at"
+            "expires_at",
+            "name"
         ], [
             apiToken,
             userId,
             "infinity",
-            "infinity"
+            "infinity",
+            name
         ]);
         return apiToken;
     }
@@ -101,17 +173,12 @@ async function generateApiToken(userId, tokenType) {
     }
 }
 exports.generateApiToken = generateApiToken;
-async function isValidApiToken(userDetails, token, tokenType) {
+async function isValidApiToken(token, tokenType) {
     try {
-        const { userId } = userDetails;
         const query = new query_1.default(tokenType == generate_secure_token_1.TokenType.PRIVATE_API ? "apitokens" : "public_apitokens");
         const result = await query.select({
             conditions: {
                 compulsory: [
-                    {
-                        key: "owner_id",
-                        value: userId
-                    },
                     {
                         key: "api_token",
                         value: token
@@ -126,7 +193,19 @@ async function isValidApiToken(userDetails, token, tokenType) {
         if ((0, utils_1.isEmpty)(result)) {
             return false;
         }
-        return true;
+        await query.update(['times_used'], [++result[0]['times_used']], {
+            compulsory: [
+                {
+                    key: "api_token",
+                    value: token
+                },
+                {
+                    key: "status",
+                    value: "active"
+                }
+            ]
+        });
+        return { userId: result[0]['owner_id'] };
     }
     catch (error) {
         console.error("Error verifying login token: ", error);

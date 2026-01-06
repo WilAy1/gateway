@@ -50,6 +50,7 @@ async function fetchCoins(params) {
                 coin_id: row.coin_id,
                 coin: row.coin,
                 contract_address: row.contract_address,
+                chain_id: row.chain_id
             });
         });
         return data;
@@ -89,7 +90,7 @@ async function fetchCoin(coinId, params) {
                 value: "active"
             }];
         if (params && !coinId) {
-            const chainDetails = await fetchChain(params.chainName);
+            const chainDetails = await fetchChain({ chainName: params.chainName });
             if (chainDetails) {
                 compulsoryConditions.push({
                     key: "chain_id",
@@ -113,7 +114,8 @@ async function fetchCoin(coinId, params) {
                 "coin_id",
                 "coin",
                 "contract_address",
-                "chain_id"
+                "chain_id",
+                "decimals"
             ],
             conditions: {
                 compulsory: compulsoryConditions
@@ -127,17 +129,27 @@ async function fetchCoin(coinId, params) {
     }
 }
 exports.fetchCoin = fetchCoin;
-async function fetchChain(chainName) {
+async function fetchChain({ chainId = null, chainName = null }) {
+    const compulsoryConditions = [];
+    if (chainId) {
+        compulsoryConditions.push({
+            key: "chain_id",
+            value: chainId
+        });
+    }
+    else if (chainName) {
+        compulsoryConditions.push({
+            key: "chain",
+            value: chainName
+        });
+    }
+    else
+        return null;
     const table = new query_1.default("available_chains");
     const result = await table.select({
         cols: ["chain_id", "chain"],
         conditions: {
-            compulsory: [
-                {
-                    key: "chain",
-                    value: chainName
-                }
-            ]
+            compulsory: compulsoryConditions
         }
     });
     if ((0, utils_1.isEmpty)(result))

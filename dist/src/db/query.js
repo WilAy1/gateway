@@ -145,7 +145,7 @@ class Table {
                 .concat((conditions.compulsory?.map((key, _) => key.value)) || []);
             //const { query, conditionValues } = this.generateCondition(conditions);
             //console.log(query, conditionValues)
-            //await pool.query(query, conditionValues); // insert into table
+            await connect_1.default.query(query, conditionValues); // insert into table
             return true;
         }
         catch (error) {

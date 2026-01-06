@@ -11,8 +11,8 @@ const express_1 = __importDefault(require("express"));
 exports.onboardingRouter = express_1.default.Router();
 exports.onboardingRouter.post('/register', async (req, res) => {
     try {
-        const { email, password } = req.body;
-        const result = await (0, auth_db_1.authRegister)(email, password);
+        const { email, password, businessName } = req.body;
+        const result = await (0, auth_db_1.authRegister)(businessName, email, password);
         if (!result.success) {
             if (result.emailExists) {
                 return res.status(http_status_codes_1.StatusCodes.CONFLICT).json({ error: result.message });

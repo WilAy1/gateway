@@ -13,7 +13,17 @@ const chain_1 = require("../../../enums/chain");
 const router_1 = require("../../public/rates/router");
 const solana_1 = __importDefault(require("../../../services/solana/solana"));
 const customers_1 = __importDefault(require("../../../db/customers/customers"));
+const ethereum_1 = __importDefault(require("../../../services/ethereum/ethereum"));
+const connect_1 = __importDefault(require("../../../db/connect"));
+const webhook_1 = require("../../../services/webhook/webhook");
+const webhook_2 = require("../../../interfaces/webhook");
 const PLATFORM_PAYMENT_URL = "http://localhost:3001/pay";
+/**
+ *
+ * @param params
+ * @deprecated
+ * @returns
+ */
 function initializeDepositTransaction(params) {
     const { amount, currency, coin, chain, refund_address, email } = params;
     if (!amount || !currency || !coin || !chain || !refund_address || !email) {
@@ -28,8 +38,9 @@ function initializeDepositTransaction(params) {
 }
 // no need for issuer
 async function getDepositAddress(issuer, params) {
-    //
+    const client = await connect_1.default.connect();
     try {
+        await client.query("BEGIN");
         let depositAddress;
         const { transaction_id, reference, chain, coin, rates } = params;
         if (!transaction_id || !reference || !chain || !coin || !rates) {
@@ -72,9 +83,13 @@ async function getDepositAddress(issuer, params) {
             };
         if (transaction["onchain_status"] == null && transaction["deposit_address"] == null) {
             const solana = new solana_1.default();
+            const etherum = new ethereum_1.default();
             switch (chain) {
                 case chain_1.ChainTypes.SOLANA:
                     depositAddress = await solana.generate({ isToken: coin != "sol" });
+                    break;
+                case chain_1.ChainTypes.ETHEREUM:
+                    depositAddress = await etherum.generate();
                     break;
                 default:
                     break;
@@ -90,6 +105,8 @@ async function getDepositAddress(issuer, params) {
                     message: "Invalid coin/chain used",
                 };
             const contract_address = coinDetails['contract_address'];
+            const coinDecimals = coinDetails['decimals'];
+            const amount_to_pay = parseFloat((0, utils_1.toFixed)(amount_to, coinDecimals));
             // change status to  awaiting_payment
             const status = TransactionStatus_1.TransactionStatus.AWAITINGPAYMENT;
             const date = new Date();
@@ -114,7 +131,7 @@ async function getDepositAddress(issuer, params) {
                 price_to,
                 price_from,
                 depositAddress,
-                amount_to,
+                amount_to_pay,
                 status,
                 address_generated_at,
                 contract_address
@@ -143,6 +160,17 @@ async function getDepositAddress(issuer, params) {
                 ]
             }
         });
+        const merchantTable = new query_1.default("users");
+        const merchant = await merchantTable.select({
+            conditions: {
+                compulsory: [
+                    {
+                        key: "user_id",
+                        value: issuer["userId"]
+                    }
+                ]
+            }
+        });
         const updatedResult = (0, utils_1.removeKeys)(newTransactionResult[0], [
             'issuer_id',
             'description',
@@ -157,21 +185,27 @@ async function getDepositAddress(issuer, params) {
             "ipaddress"
         ]);
         //startSolanaListening(updatedResult['deposit_address'] as string);
+        await client.query("COMMIT");
         return {
             status: true,
             message: "Successfully generated address",
-            result: updatedResult
+            result: { ...updatedResult, merchant: { name: merchant[0]["business_name"] } }
         };
     }
     catch (error) {
+        await client.query("ROLLBACK");
         console.error(error);
         throw new Error("Failed to create deposit address");
     }
+    finally {
+        client.release();
+    }
 }
 exports.getDepositAddress = getDepositAddress;
-async function fetchTransaction(issuer, params) {
+async function fetchTransaction(issuer, params, addCustomer = false) {
     try {
         const query = new query_1.default("transactions");
+        const merchantTable = new query_1.default("users");
         const { reference } = params;
         const transaction = await query.select({
             conditions: {
@@ -187,12 +221,20 @@ async function fetchTransaction(issuer, params) {
                 ]
             }
         });
-        if (!(0, utils_1.isEmpty)(transaction)) {
-            const updatedResult = (0, utils_1.removeKeys)(transaction[0], [
+        const merchant = await merchantTable.select({
+            conditions: {
+                compulsory: [
+                    {
+                        key: "user_id",
+                        value: issuer["userId"]
+                    }
+                ]
+            }
+        });
+        if (!(0, utils_1.isEmpty)(transaction) && !(0, utils_1.isEmpty)(merchant)) {
+            const keys = [
                 'issuer_id',
                 'description',
-                'customer_id',
-                "customer_email",
                 "customer_metadata",
                 "application_fee",
                 "fee_denomination",
@@ -200,12 +242,16 @@ async function fetchTransaction(issuer, params) {
                 "device_type",
                 "useragent",
                 "ipaddress"
-            ]);
+            ];
+            if (!addCustomer) {
+                keys.push('customer_id', "customer_email");
+            }
+            const updatedResult = (0, utils_1.removeKeys)(transaction[0], keys);
             //startSolanaListening(updatedResult['deposit_address'] as string);
             return {
                 status: true,
                 message: "Successfully fetched transaction",
-                result: updatedResult
+                result: { ...updatedResult, merchant: { name: merchant[0]["business_name"] } }
             };
         }
         return {
@@ -222,20 +268,25 @@ async function fetchTransaction(issuer, params) {
 exports.fetchTransaction = fetchTransaction;
 // issuer needed
 async function generatePaymentUrl(issuer, params) {
+    const client = await connect_1.default.connect();
     try {
+        await client.query("BEGIN");
         // expected params
         // amount, currency, email
         const { amount, currency, customer, callback_url, description, metadata } = params;
         if (!amount || !currency || !customer || (!customer.id && !customer.email))
             return { status: false, error: 'invalid_params', message: "Failed to create transaction" };
-        if (customer.id) {
+        if (customer.id || customer.email) {
             const customerObj = new customers_1.default(issuer['userId']);
-            const customerExists = await customerObj.customerExists({ id: customer.id });
+            const customerExists = await customerObj.customerExists({ id: customer.id ? customer.id : customer.email });
             if (!customerExists && !(0, utils_1.isValidEmail)(customer.email)) {
                 return { status: false, error: 'invalid_params', message: "Failed to create transaction - use a valid customer or enter customer id" };
             }
             if (!(0, utils_1.isValidEmail)(customer.email)) {
                 customer.email = customerExists['email'];
+            }
+            if (!(0, utils_1.isValidUUID)(customer.id) && customerExists) {
+                customer.id = customerExists.toString();
             }
         }
         const currencyCheck = await currencyExists(currency);
@@ -281,7 +332,10 @@ async function generatePaymentUrl(issuer, params) {
             callback_url
         ];
         const result = await query.insert(keys, values, { returnColumn: "id" });
+        await client.query("COMMIT");
         if (result) {
+            const webhook = new webhook_1.Webhook(issuer['userId']);
+            webhook.sendTransaction(result["id"], webhook_2.WebhookEvent.TRANSACTION_CREATED);
             return {
                 status: true,
                 message: "Transaction generated",
@@ -296,8 +350,12 @@ async function generatePaymentUrl(issuer, params) {
         };
     }
     catch (error) {
+        await client.query("ROLLBACK");
         console.error('Error creating transaction: ', error);
         throw new Error('Error creating transaction');
+    }
+    finally {
+        client.release();
     }
 }
 exports.generatePaymentUrl = generatePaymentUrl;

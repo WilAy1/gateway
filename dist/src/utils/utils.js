@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.removeKeys = exports.analyzeRequestParams = exports.parseUserAgent = exports.generateRandomHash = exports.isValidPassword = exports.isValidEmail = exports.codeGenerator = exports.isEmpty = exports.isValidUUID = exports.makeObjectUnique = void 0;
+exports.toFixed = exports.removeKeys = exports.analyzeRequestParams = exports.parseUserAgent = exports.generateRandomHash = exports.isValidPassword = exports.isValidEmail = exports.codeGenerator = exports.isEmpty = exports.isValidURL = exports.isValidUUID = exports.makeObjectUnique = void 0;
 const crypto_1 = __importDefault(require("crypto"));
 function makeObjectUnique(objArray) {
     const newObj = {};
@@ -28,6 +28,11 @@ function isValidUUID(uuid) {
     return uuidRegex.test(uuid);
 }
 exports.isValidUUID = isValidUUID;
+function isValidURL(url) {
+    const regex = /^(https?|ftp):\/\/(([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|localhost)(:\d{1,5})?(\/[^\s]*)?$/;
+    return regex.test(url);
+}
+exports.isValidURL = isValidURL;
 function isEmpty(data) {
     if (typeof data == "string")
         data = data.trim();
@@ -101,4 +106,9 @@ function removeKeys(obj, keysToRemove) {
     return newObj;
 }
 exports.removeKeys = removeKeys;
+function toFixed(num, fixed) {
+    const re = new RegExp('^-?\\d+(?:.\\d{0,' + (fixed || -1) + '})?');
+    return num.toString().match(re)[0];
+}
+exports.toFixed = toFixed;
 //# sourceMappingURL=utils.js.map

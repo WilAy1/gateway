@@ -3,22 +3,26 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TransactionsDBQueries = exports.SolanaTransactions = exports.TransactionDB = void 0;
+exports.TransactionsDBQueries = exports.TransactionDB = void 0;
 const wallet_db_1 = require("../wallet/wallet.db");
 const query_1 = __importDefault(require("../query"));
 const utils_1 = require("../../utils/utils");
 const TransactionStatus_1 = require("../../interfaces/TransactionStatus");
 const chain_1 = require("../../enums/chain");
-const solana_1 = __importDefault(require("../../services/solana/solana"));
 const functions_db_1 = require("../crypto/functions.db");
-const webhook_1 = require("../../webhook/webhook");
+const settlement_1 = __importDefault(require("../../services/solana/settlement"));
+const settlements_1 = __importDefault(require("../settlements/settlements"));
+const connect_1 = __importDefault(require("../connect"));
+const webhook_1 = require("../../interfaces/webhook");
+const webhook_2 = require("../../services/webhook/webhook");
 class TransactionsDBQueries {
     constructor(issuer) {
         this.transactions = new query_1.default("transactions");
         if (issuer)
             this.issuer = issuer;
     }
-    async fetchTransactions(params) {
+    async fetchTransactions(params, useStats) {
+        console.log(useStats);
         try {
             const transaction = await this.transactions.select(params || {
                 conditions: {
@@ -30,7 +34,13 @@ class TransactionsDBQueries {
                     ]
                 }
             });
-            return transaction;
+            if (!useStats)
+                return transaction;
+            const stats = await this.transactions.customQuery(`SELECT COUNT(*) AS total_txn, 
+                                    COUNT(CASE WHEN status='completed' THEN 1 END) AS completed_txn, 
+                                    COUNT(CASE WHEN status IN ('awaiting_payment', 'awaiting_confirmation') THEN 1 END) AS pending_txn,
+                                    COUNT(CASE WHEN status='cancelled' THEN 1 END) AS cancelled_txn FROM transactions`, []);
+            return { txns: transaction, stats: stats['rows'][0] };
         }
         catch (error) {
             console.error(error);
@@ -46,6 +56,28 @@ class TransactionsDBQueries {
                             key: "issuer_id",
                             value: this.issuer
                         },
+                        {
+                            key: "id",
+                            value: transaction_id
+                        },
+                    ]
+                }
+            });
+            if ((0, utils_1.isEmpty)(transaction)) {
+                return;
+            }
+            return transaction[0];
+        }
+        catch (error) {
+            console.error(error);
+            throw new Error("Error fetching transaction");
+        }
+    }
+    async fetchWithoutIssuer(transaction_id) {
+        try {
+            const transaction = await this.transactions.select({
+                conditions: {
+                    compulsory: [
                         {
                             key: "id",
                             value: transaction_id
@@ -123,6 +155,11 @@ class TransactionDB extends TransactionsDBQueries {
                 ]
             };
             const update = await this.updateTransaction(id, ['cancelled_at', 'status'], [isoTime, TransactionStatus_1.TransactionStatus.CANCELLED], conditions);
+            if (update) {
+                const transaction = await this.fetchWithoutIssuer(id);
+                const webhook = new webhook_2.Webhook(transaction["issuer_id"]);
+                webhook.sendTransaction(id, webhook_1.WebhookEvent.TRANSACTION_CANCELLED);
+            }
             return update;
         }
         catch {
@@ -130,11 +167,15 @@ class TransactionDB extends TransactionsDBQueries {
         }
     }
     async confirmTransaction(transactionParam) {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { Webhook, WebhookEvent } = require("../../services/webhook/webhook");
         const { transactionId, transactionHash, status: transactionStatus, depositReceived } = transactionParam;
+        const client = await connect_1.default.connect();
         try {
+            await client.query("BEGIN");
             const transaction = await this.fetchTransaction(transactionId);
             if (!transaction) {
-                return;
+                return false;
             }
             if (transaction["status"] != TransactionStatus_1.TransactionStatus.COMPLETED &&
                 transaction["status"] != TransactionStatus_1.TransactionStatus.INITIALIZED &&
@@ -167,19 +208,41 @@ class TransactionDB extends TransactionsDBQueries {
                 }
                 const update = await this.updateTransaction(transactionId, Object.keys(updateObject), Object.values(updateObject));
                 //await subscribe();
-                if (!update)
+                if (!update) {
+                    await client.query("ROLLBACK");
                     return false;
+                }
+                // credit based on settlement fallback to credit if failed  
                 const wallet = new wallet_db_1.WalletDB({ userId: this.issuer });
                 const creditStatus = await wallet.credit(coinDetails.coin_id, amount_to_credit, wallet_db_1.CREDIT_REASONS.transaction_completed, transactionId);
-                const webhook = new webhook_1.Webhook(this.issuer);
-                webhook.sendTransaction(transactionId, webhook_1.WebhookEvent.TRANSACTION_COMPLETED);
+                if (!creditStatus) {
+                    await client.query("ROLLBACK");
+                    return false;
+                }
+                await client.query("COMMIT");
+                const webhook = new Webhook(this.issuer);
+                webhook.sendTransaction(transactionId, WebhookEvent.TRANSACTION_COMPLETED);
+                // start settlement
+                if (transaction.chain == chain_1.ChainTypes.SOLANA) {
+                    const settlement = new settlements_1.default(this.issuer);
+                    const settlementAddress = await settlement.get({ byChainId: coinDetails.chain_id });
+                    if (settlementAddress.length > 0) {
+                        const solanaSettlement = new settlement_1.default();
+                        solanaSettlement.settle({ transaction: transaction, amount: amount_to_credit, fee: application_fee, tokenAddress: coinDetails.contract_address, settlementAddress: settlementAddress[0]["address"], coinDetails: coinDetails });
+                        //if(settled) wallet.debit(coinDetails.coin_id, amount_to_credit, DEBIT_REASONS.settlement_completed, transactionId);
+                    }
+                }
                 return creditStatus ?? false;
             }
             return false;
         }
         catch (error) {
+            await client.query("ROLLBACK");
             console.error("Couldn't complete transaction: ", error);
             return false;
+        }
+        finally {
+            client.release();
         }
         //update
         /**
@@ -195,182 +258,4 @@ class TransactionDB extends TransactionsDBQueries {
     }
 }
 exports.TransactionDB = TransactionDB;
-class SolanaTransactions {
-    constructor() {
-        this.transactions = new query_1.default("transactions");
-        this.walletTable = new query_1.default("solana_wallets");
-    }
-    async fetchAll() {
-    }
-    async fetchWalletData(address) {
-        try {
-            const wallet = await this.walletTable.select({
-                conditions: {
-                    compulsory: [
-                        {
-                            key: "address",
-                            value: address
-                        }
-                    ]
-                }
-            });
-            if (wallet) {
-                return wallet[0];
-            }
-            return;
-        }
-        catch (error) {
-            console.error(error);
-            throw new Error("Error fetching wallet data");
-        }
-    }
-    async fetchUnfinished() {
-        try {
-            const transaction = await this.transactions.select({
-                conditions: {
-                    compulsory: [
-                        {
-                            key: "chain",
-                            value: chain_1.ChainTypes.SOLANA
-                        },
-                        {
-                            key: "status",
-                            value: TransactionStatus_1.TransactionStatus.AWAITINGPAYMENT
-                        }
-                    ]
-                }
-            });
-            return transaction;
-        }
-        catch (error) {
-            console.error(error);
-            throw new Error("Error fetching transactions");
-        }
-    }
-    async findTransactionWithAddress(address) {
-        try {
-            const transaction = await this.transactions.select({
-                conditions: {
-                    compulsory: [
-                        {
-                            key: "chain",
-                            value: chain_1.ChainTypes.SOLANA
-                        },
-                        {
-                            key: "deposit_address",
-                            value: address
-                        }
-                    ]
-                }
-            });
-            return transaction;
-        }
-        catch (error) {
-            console.error(error);
-            throw new Error("Error fetching transactions");
-        }
-    }
-    async parse(payload) {
-        const { meta, transaction, blockTime } = payload;
-        const { postBalances } = meta;
-        const { message, signatures } = transaction;
-        const { accountKeys } = message;
-        const depositAddress = accountKeys[1]['pubkey'].toString();
-        const transactionHash = signatures[0];
-        const addressBalance = postBalances[1] / 1000000000;
-        const transactions = await this.findTransactionWithAddress(depositAddress);
-        if ((0, utils_1.isEmpty)(transactions)) {
-            return;
-        }
-        const id = transactions[0]['id'];
-        const issuer = transactions[0]['issuer_id'];
-        const amount_to_pay = transactions[0]['amount_to_pay'];
-        const date = new Date();
-        date.setTime(blockTime * 1000);
-        if (addressBalance >= amount_to_pay) {
-            const transactionDB = new TransactionDB(issuer);
-            await transactionDB.confirmTransaction({
-                transactionId: String(id),
-                transactionHash: transactionHash,
-                status: TransactionStatus_1.TransactionStatus.COMPLETED,
-                depositReceived: date.toISOString()
-            });
-            const walletAddress = this.fetchWalletData(depositAddress);
-            if (walletAddress) {
-                const logId = walletAddress['account_id'];
-                const solana = new solana_1.default();
-                solana.unsubscribe(logId);
-            }
-        }
-        else if (addressBalance < amount_to_pay) {
-            //
-        }
-    }
-    async parseForToken(payload, depositAddress) {
-        const parsedInstr = payload.transaction.message.instructions.find((instr) => instr.programId.toString() === "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
-        if (!parsedInstr)
-            return;
-        const tokenId = parsedInstr.parsed.info.mint;
-        const { meta, transaction, blockTime } = payload;
-        const { postTokenBalances } = meta;
-        const { signatures } = transaction;
-        const addressBalance = postTokenBalances.find((tokenBalances) => tokenBalances.owner == depositAddress).uiTokenAmount.uiAmount;
-        const transactionHash = signatures[0];
-        const transactions = await this.findTransactionWithAddress(depositAddress);
-        if ((0, utils_1.isEmpty)(transactions)) {
-            return;
-        }
-        const coin = transactions[0]['coin'];
-        const { contract_address } = await this.getCoinDetails(coin);
-        if (contract_address != tokenId) {
-            console.log("wrong token for transaction");
-            return;
-        }
-        const id = transactions[0]['id'];
-        const issuer = transactions[0]['issuer_id'];
-        const amount_to_pay = transactions[0]['amount_to_pay'];
-        const date = new Date();
-        date.setTime(blockTime * 1000);
-        if (addressBalance >= amount_to_pay) {
-            const transactionDB = new TransactionDB(issuer);
-            await transactionDB.confirmTransaction({
-                transactionId: String(id),
-                transactionHash: transactionHash,
-                status: TransactionStatus_1.TransactionStatus.COMPLETED,
-                depositReceived: date.toISOString()
-            });
-            // const walletAddress = this.fetchWalletData(depositAddress);
-            // if(walletAddress){
-            //     const logId = walletAddress['account_id'];
-            //     const solana = new Solana();
-            //     solana.unsubscribe(logId);
-            // }
-        }
-    }
-    async getCoinDetails(coin) {
-        const coinsTable = new query_1.default("available_coins");
-        const result = await coinsTable.select({
-            cols: [
-                "contract_address",
-            ],
-            conditions: {
-                compulsory: [
-                    {
-                        key: "status",
-                        value: "active"
-                    },
-                    {
-                        key: "coin",
-                        value: coin
-                    }
-                ]
-            }
-        });
-        if ((0, utils_1.isEmpty)(result)) {
-            return;
-        }
-        return result[0];
-    }
-}
-exports.SolanaTransactions = SolanaTransactions;
 //# sourceMappingURL=transactions.db.js.map

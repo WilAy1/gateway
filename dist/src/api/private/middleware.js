@@ -10,34 +10,50 @@ const process_1 = require("process");
 const api_token_db_1 = require("../../db/users/api_token.db");
 const generate_secure_token_1 = require("../../utils/generate_secure_token");
 const publicPaths = ['/transaction/create', '/transaction/generate-address', '/transaction/fetch'];
-function authenticate(req, res, next) {
+const gatewayPayPaths = ['/transaction/generate-address', '/transaction/fetch', '/transaction/cancel'];
+async function authenticate(req, res, next) {
     const authHeader = req.headers['authorization'];
+    const tokenType = authHeader && authHeader.split(' ')[0];
     const token = authHeader && authHeader.split(' ')[1];
     if (!token) {
         return res.status(http_status_codes_1.StatusCodes.UNAUTHORIZED).json({ error: "unauthorized" }); // Unauthorized if token is missing
     }
-    // verify if it is a public token
-    jsonwebtoken_1.default.verify(token, process_1.env.SECURE_PUBLIC_GEN_KEY, async (err, user) => {
-        if (!err && publicPaths.includes(req.path)) {
-            if (await (0, api_token_db_1.isValidApiToken)(user, token, generate_secure_token_1.TokenType.PUBLIC_API)) {
+    if (tokenType == 'x-api-key') {
+        const publicToken = await (0, api_token_db_1.isValidApiToken)(token, generate_secure_token_1.TokenType.PUBLIC_API);
+        if (publicToken) {
+            if (publicPaths.includes(req.path)) {
+                req.user = publicToken;
+                return next();
+            }
+            else {
+                return res.status(http_status_codes_1.StatusCodes.FORBIDDEN).json({ error: "forbidden" });
+            }
+        }
+        else {
+            const privateToken = await (0, api_token_db_1.isValidApiToken)(token, generate_secure_token_1.TokenType.PRIVATE_API);
+            if (privateToken) {
+                req.user = privateToken;
+                return next();
+            }
+            else {
+                return res.status(http_status_codes_1.StatusCodes.UNAUTHORIZED).json({ error: "unauthorized" });
+            }
+        }
+    }
+    else if (tokenType == 'Bearer') {
+        jsonwebtoken_1.default.verify(token, process_1.env.SECURE_TRANSACTION_HANDSHAKE_GEN_KEY, async (err, user) => {
+            if (!err && gatewayPayPaths.includes(req.path)) {
                 req.user = user;
                 return next(); // Proceed to the next middleware
             }
-        }
-        // Verify the token using the secret key
-        jsonwebtoken_1.default.verify(token, process_1.env.SECURE_GEN_KEY, async (err, user) => {
-            if (!err) {
-                const validToken = await (0, api_token_db_1.isValidApiToken)(user, token, generate_secure_token_1.TokenType.PRIVATE_API);
-                if (validToken) {
-                    req.user = user;
-                    return next(); // Proceed to the next middleware
-                }
-            }
             else {
-                return res.status(http_status_codes_1.StatusCodes.FORBIDDEN).json({ error: "forbidden" }); // Forbidden if token is invalid
+                return res.status(http_status_codes_1.StatusCodes.UNAUTHORIZED).json({ error: "unauthorized" });
             }
         });
-    });
+    }
+    else {
+        return res.status(http_status_codes_1.StatusCodes.UNAUTHORIZED).json({ error: "unauthorized" });
+    }
 }
 exports.authenticate = authenticate;
 //# sourceMappingURL=middleware.js.map

@@ -10,13 +10,13 @@ const utils_1 = require("../../utils/utils");
 const query_1 = __importDefault(require("../query"));
 const connect_1 = __importDefault(require("../connect"));
 const generate_secure_token_1 = require("../../utils/generate_secure_token");
-async function authRegister(email, password) {
+async function authRegister(businessName, email, password) {
     let client;
     try {
         email = email.trim();
-        if (!(0, utils_1.isValidEmail)(email) && !(0, utils_1.isValidPassword)(password)) {
+        if (!(0, utils_1.isValidEmail)(email) && !(0, utils_1.isValidPassword)(password) && businessName.length < 2) {
             return {
-                message: "Invalid email/password format",
+                message: "Invalid business name, email or password format",
                 success: false
             };
         }
@@ -54,6 +54,7 @@ async function authRegister(email, password) {
         // hash is used as a placeholder till veriification is complete, 1 hr expiry
         const randomHash = (0, utils_1.generateRandomHash)(32);
         query.insert([
+            "business_name",
             "email",
             "password",
             "hash",
@@ -65,6 +66,7 @@ async function authRegister(email, password) {
             "verification_code_expiry",
             "created_at"
         ], [
+            businessName,
             email,
             hashedPassword,
             randomHash,

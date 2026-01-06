@@ -3,13 +3,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CREDIT_REASONS = exports.WalletDB = void 0;
+exports.DEBIT_REASONS = exports.CREDIT_REASONS = exports.WalletDB = void 0;
 const utils_1 = require("../../utils/utils");
 const query_1 = __importDefault(require("../query"));
 var CREDIT_REASONS;
 (function (CREDIT_REASONS) {
     CREDIT_REASONS["transaction_completed"] = "transaction_completed";
 })(CREDIT_REASONS || (exports.CREDIT_REASONS = CREDIT_REASONS = {}));
+var DEBIT_REASONS;
+(function (DEBIT_REASONS) {
+    DEBIT_REASONS["settlement_completed"] = "settlement_completed";
+})(DEBIT_REASONS || (exports.DEBIT_REASONS = DEBIT_REASONS = {}));
 /**
  * WALLET TABLE | COLS
  * user_id uuid
@@ -83,6 +87,7 @@ class WalletDBQueries {
     }
     async updateUserAsset(coinId, amount) {
         try {
+            console.log(amount);
             const asset = await this.getUserAsset(coinId);
             if (asset) {
                 await this.wallet_table.update(["balance"], [amount], {
@@ -225,7 +230,28 @@ class WalletDB extends WalletDBQueries {
         this.createWalletActivity(activity);
         return true;
     }
-    debit() {
+    async debit(coinId, amount, reason, reference_id) {
+        const asset = await this.getUserAsset(coinId);
+        let newAmount = amount;
+        if (asset) {
+            const currentAmount = parseFloat(asset["balance"]);
+            newAmount = currentAmount - newAmount;
+        }
+        const date = new Date();
+        const currentIsoTIme = date.toISOString();
+        const activity = {
+            user_id: this.userId,
+            coin_id: coinId,
+            amount: amount,
+            activity_type: ACTIVITY_TYPE.debit,
+            reference_id: reference_id,
+            reference_origin: ReferenceOrigin.transaction,
+            reason: DEBIT_REASONS.settlement_completed,
+            created: currentIsoTIme
+        };
+        this.updateUserAsset(coinId, newAmount);
+        this.createWalletActivity(activity);
+        return true;
     }
     log() {
     }

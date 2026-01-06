@@ -18,6 +18,10 @@ function generatePublicApiToken(data, expiresIn) {
     const token = jsonwebtoken_1.default.sign(data, env_1.env.SECURE_PUBLIC_GEN_KEY, expiresIn && { expiresIn });
     return token;
 }
+function generateHandshakeToken(data) {
+    const token = jsonwebtoken_1.default.sign(data, env_1.env.SECURE_TRANSACTION_HANDSHAKE_GEN_KEY);
+    return token;
+}
 function generateToken(tokenType, data, expiresIn) {
     switch (tokenType) {
         case TokenType.LOGIN:
@@ -26,6 +30,8 @@ function generateToken(tokenType, data, expiresIn) {
             return generateApiToken(data, expiresIn);
         case TokenType.PUBLIC_API:
             return generatePublicApiToken(data, expiresIn);
+        case TokenType.TRANSACTION_HANDSHAKE:
+            return generateHandshakeToken(data);
         default:
             return null;
     }
@@ -36,6 +42,7 @@ var TokenType;
     TokenType[TokenType["LOGIN"] = 0] = "LOGIN";
     TokenType[TokenType["PRIVATE_API"] = 1] = "PRIVATE_API";
     TokenType[TokenType["PUBLIC_API"] = 2] = "PUBLIC_API";
+    TokenType[TokenType["TRANSACTION_HANDSHAKE"] = 3] = "TRANSACTION_HANDSHAKE";
 })(TokenType || (exports.TokenType = TokenType = {}));
 // export function verifyBearerToken({ email, password, token }) : boolean {
 //     try {
