@@ -1,8 +1,8 @@
 export const SYMBOLS = [
-    {
-        id: "ngn",
-        ticker: "USDTNGN",
-    },
+    // {
+    //     id: "ngn",
+    //     ticker: "USDTNGN",
+    // },
     {
         id: "sol",
         ticker: "SOLUSDT"

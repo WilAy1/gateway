@@ -24,7 +24,7 @@ export default class Rates {
                 }
             });
             rates.push({id:"usd", rate:1}, {id: "usdt", rate: 1});
-            
+            rates.push({id:"ngn", rate: 1460});
             this.cacheRates(rates).then((c)=>console.log("cache successful", c)).catch((error)=>console.log(error));
         } catch (error) {
             console.log(error)
