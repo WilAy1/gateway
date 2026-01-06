@@ -53,7 +53,9 @@ export default class Rates {
 
     async getRate(id: string){
         try {
-            const client = createClient();
+            const client = createClient({
+            url: process.env.REDIS_URL
+        });
             client.connect().catch(console.error);
             const reply = await client.get(id);
             return JSON.parse(reply) as APIRate;
