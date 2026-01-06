@@ -4,7 +4,8 @@
   "description": "",
   "main": "test.js",
   "scripts": {
-    "start": "tsc && node dist/app.js",
+    "start": "node dist/app.js",
+    "build": "tsc",
     "dev": "nodemon --exec 'ts-node' src/app.ts",
     "lint": "eslint . - ext .ts",
     "test": "jest"
