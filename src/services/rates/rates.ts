@@ -2,6 +2,10 @@ import axios from 'axios';
 import { getSymbolId, SYMBOLS } from './symbols';
 import { createClient } from 'redis';
 
+if (!process.env.REDIS_URL) {
+  throw new Error("REDIS_URL is not set in environment!");
+}
+
 export default class Rates {
 
     async fetchRates(){
@@ -29,7 +33,7 @@ export default class Rates {
 
     async cacheRates(rates){
         const client = createClient({
-            url: process.env.REDIS_URL || "redis://default:bakVUAeuCRGikMRuJjoQQpsMBePUxNVO@gondola.proxy.rlwy.net:28474"
+            url: process.env.REDIS_URL
         });
         client.connect().catch(console.error);
         if(client){
