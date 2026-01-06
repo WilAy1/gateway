@@ -12,7 +12,7 @@ export default class Rates {
         const tickers = SYMBOLS.map((symbol) => symbol.ticker);
 
         try {
-            const response = await axios.get('https://api.binance.com/api/v3/ticker/price', {
+            const response = await axios.get('https://api.binance.us/api/v3/ticker/price', {
                 params: {
                     symbols: JSON.stringify(tickers)
                 }
