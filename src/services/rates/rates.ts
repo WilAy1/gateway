@@ -27,6 +27,7 @@ export default class Rates {
             
             this.cacheRates(rates).then((c)=>console.log("cache successful", c)).catch((error)=>console.log(error));
         } catch (error) {
+            console.log(error)
             //
         }
     }
