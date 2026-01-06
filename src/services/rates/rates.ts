@@ -29,7 +29,7 @@ export default class Rates {
 
     async cacheRates(rates){
         const client = createClient({
-            url: "redis://default:bakVUAeuCRGikMRuJjoQQpsMBePUxNVO@gondola.proxy.rlwy.net:28474"
+            url: process.env.REDIS_URL || "redis://default:bakVUAeuCRGikMRuJjoQQpsMBePUxNVO@gondola.proxy.rlwy.net:28474"
         });
         client.connect().catch(console.error);
         if(client){
