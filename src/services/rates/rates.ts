@@ -25,7 +25,7 @@ export default class Rates {
             });
             rates.push({id:"usd", rate:1}, {id: "usdt", rate: 1});
             
-            this.cacheRates(rates);
+            this.cacheRates(rates).then((c)=>console.log("cache successful", c)).catch((error)=>console.log(error));
         } catch (error) {
             //
         }
@@ -58,6 +58,7 @@ export default class Rates {
         });
             client.connect().catch(console.error);
             const reply = await client.get(id);
+            console.log("reply", reply)
             return JSON.parse(reply) as APIRate;
           } catch (err) {
             throw new Error(`Failed to get rate for ${id}: ${err.message}`);
