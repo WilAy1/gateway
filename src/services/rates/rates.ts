@@ -61,6 +61,7 @@ export default class Rates {
             console.log("reply", reply)
             return JSON.parse(reply) as APIRate;
           } catch (err) {
+            console.log(err);
             throw new Error(`Failed to get rate for ${id}: ${err.message}`);
           }
     }
