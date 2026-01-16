@@ -11,15 +11,18 @@ const gatewayPayPaths = ['/transaction/generate-address', '/transaction/fetch', 
 export async function authenticate(req, res, next) {
     
     const authHeader = req.headers['authorization'];
+    const xApiKey = req.headers['X-Api-Key'] || req.headers['x-api-key'];
+
     const tokenType = authHeader && authHeader.split(' ')[0];
     const token = authHeader && authHeader.split(' ')[1];
 
-    if (!token) {
+
+    if (!xApiKey && !token) {
       return res.status(StatusCodes.UNAUTHORIZED).json({ error: "unauthorized" }); // Unauthorized if token is missing
     }
 
-    if(tokenType == 'x-api-key'){
-        const publicToken = await isValidApiToken(token, TokenType.PUBLIC_API);
+    if(xApiKey){
+        const publicToken = await isValidApiToken(xApiKey, TokenType.PUBLIC_API);
         if(publicToken){
           if(publicPaths.includes(req.path)){
             req.user = publicToken;
@@ -30,7 +33,7 @@ export async function authenticate(req, res, next) {
           }
         }
         else {
-          const privateToken = await isValidApiToken(token, TokenType.PRIVATE_API);
+          const privateToken = await isValidApiToken(xApiKey, TokenType.PRIVATE_API);
           if(privateToken) {
             req.user = privateToken;
             return next();
@@ -40,7 +43,7 @@ export async function authenticate(req, res, next) {
           }
         }
     }
-    else if (tokenType == 'Bearer') {
+    else if (tokenType == 'Bearer') { // don't use
       jwt.verify(token, env.SECURE_TRANSACTION_HANDSHAKE_GEN_KEY, async(err, user)=>{
         if (!err && gatewayPayPaths.includes(req.path)) {
             req.user = user;
