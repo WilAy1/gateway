@@ -232,14 +232,13 @@ createTransactionRouter.post('/generate-address', async (req, res) => {
 })
 
 function parsePlatformCreateTransaction(req: Request) : InitTransactionParams {
-    const { amount, currency, customer, metadata = {}, callback_url = null, description = null } = req.body;
-    
+    const { amount, currency, customer, metadata = {}, callbackUrl = null, description = null } = req.body;
     return {
         amount: amount,
         currency: currency,
         customer: customer,
         metadata: metadata,
-        callback_url: callback_url,
+        callback_url: callbackUrl,
         description: description
     }
 }
